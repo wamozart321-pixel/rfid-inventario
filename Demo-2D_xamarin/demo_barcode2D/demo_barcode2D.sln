@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1622
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "demo_barcode2D", "demo_barcode2D\demo_barcode2D.csproj", "{B34E4C1D-A344-4140-9A9D-C33318EB8231}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B34E4C1D-A344-4140-9A9D-C33318EB8231}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B34E4C1D-A344-4140-9A9D-C33318EB8231}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B34E4C1D-A344-4140-9A9D-C33318EB8231}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{B34E4C1D-A344-4140-9A9D-C33318EB8231}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B34E4C1D-A344-4140-9A9D-C33318EB8231}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B34E4C1D-A344-4140-9A9D-C33318EB8231}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {119650C3-F578-4057-BC96-F1055ED52B47}
+	EndGlobalSection
+EndGlobal

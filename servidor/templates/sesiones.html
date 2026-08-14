@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>Sesiones de conteo</h1></div>
+
+<div class="card">
+  <h3>Abrir nueva sesión</h3>
+  <form method="post">
+    <div class="formfila">
+      <input name="nombre" placeholder="Nombre (ej: Bodega julio)" style="flex:1;min-width:220px">
+      <button>Abrir sesión</button>
+      <span class="ayuda">al abrir una, la anterior se cierra</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:24px;flex-wrap:wrap">
+      <label style="cursor:pointer"><input type="radio" name="tipo" value="verificacion" checked>
+        <b>Verificación</b> — compara lo leído contra la cantidad establecida
+        (completos / parciales / faltantes)</label>
+      <label style="cursor:pointer"><input type="radio" name="tipo" value="total">
+        <b>Conteo total</b> — inventario desde cero: al cerrar la sesión, lo contado
+        se convierte en la nueva cantidad oficial de cada producto etiquetado</label>
+    </div>
+  </form>
+</div>
+
+<div class="card"><div class="tablewrap">
+<table>
+  <thead><tr><th>#</th><th>Nombre</th><th>Tipo</th><th>Estado</th>
+  <th class="num">Lecturas</th><th>Creada</th><th></th></tr></thead>
+  <tbody>
+  {% for s in rows %}
+  <tr>
+    <td class="mono">{{s['id']}}</td>
+    <td><a href="/sesiones/{{s['id']}}">{{s['nombre']}}</a></td>
+    <td><span class="tag {{'warn' if s['tipo']=='total' else 'gris'}}">{{'conteo total' if s['tipo']=='total' else 'verificación'}}</span></td>
+    <td><span class="tag {{'ok' if s['estado']=='abierta' else 'gris'}}">{{s['estado']}}</span></td>
+    <td class="num">{{s['n']}}</td>
+    <td class="mono">{{s['creada'][:16].replace('T',' ')}}</td>
+    <td><a class="btn sec mini" href="/sesiones/{{s['id']}}/csv">⬇ CSV</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if not rows %}<div class="vacio">Sin sesiones todavía.</div>{% endif %}
+</div>
+{% endblock %}

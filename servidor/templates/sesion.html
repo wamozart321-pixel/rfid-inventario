@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo">
+  <h1>{{s['nombre']}}</h1>
+  <span class="tag {{'warn' if s['tipo']=='total' else 'gris'}}">{{'conteo total' if s['tipo']=='total' else 'verificación'}}</span>
+  <span class="tag {{'ok' if s['estado']=='abierta' else 'gris'}}">{{s['estado']}}</span>
+  {% if s['estado']=='abierta' %}<span class="sub">avance en vivo</span>{% endif %}
+</div>
+
+<div class="formfila" style="margin-bottom:16px">
+  <a class="btn sec" href="/sesiones/{{s['id']}}/csv">⬇ Exportar CSV</a>
+  {% if s['estado']=='abierta' %}
+  <form class="inline" method="post" action="/sesiones/{{s['id']}}/cerrar"
+        {% if s['tipo']=='total' %}onsubmit="return confirm('Al cerrar este CONTEO TOTAL, lo contado se convertirá en la cantidad oficial de cada producto etiquetado. ¿Continuar?')"{% endif %}>
+    <button class="sec">Cerrar sesión</button></form>
+  {% endif %}
+  <a class="btn sec" href="/sesiones">← Todas las sesiones</a>
+</div>
+{% if s['estado']=='abierta' and s['tipo']=='total' %}
+<div class="msg">⚠ Sesión de conteo total: al cerrarla, la columna "esperado" de cada
+producto etiquetado se reemplazará por lo que se haya contado aquí. Recorre toda la
+bodega antes de cerrar.</div>
+{% endif %}
+
+<div class="card" style="padding:12px;margin-bottom:10px">
+  <h3>EPC sin producto asociado (<span id="n-desc">{{desconocidos|length}}</span>)
+    &nbsp;<a href="/desconocidos" style="font-weight:normal">→ revisar y asignar</a></h3>
+  <div class="feed" id="lista-desc" style="max-height:170px">
+    {% for x in desconocidos %}
+    <div class="fila"><time>{{x['ts'][11:19]}}</time>
+      <span class="epc">{{x['epc']}}</span>
+      <span class="quien">{{x['dispositivo']}}</span></div>
+    {% else %}
+    <div class="vacio">Ninguno. Todo lo leído está asociado a un producto.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="padding:12px;margin-bottom:10px">
+  <h3>Avance por producto</h3>
+  <div class="formfila" style="margin-bottom:8px">
+    <input id="buscar" placeholder="Buscar por SKU, nombre o ubicación…" style="flex:1;min-width:220px">
+  </div>
+  <div class="tablewrap">
+  <table id="tabla-avance" data-sid="{{s['id']}}" data-estado="{{s['estado']}}">
+    <thead><tr><th>SKU</th><th>Producto</th><th>Ubicación</th><th style="min-width:190px">Leído / esperado</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for r in resumen %}
+    {% set esp = r['cantidad_esperada'] %}{% set lei = r['leidos'] %}
+    {% set pct = (100 if esp==0 and lei>0 else (lei*100//esp if esp>0 else 0)) %}
+    <tr data-q="{{(r['sku']~' '~r['nombre']~' '~r['ubicacion'])|lower}}">
+      <td class="mono">{{r['sku']}}</td><td>{{r['nombre']}}</td><td>{{r['ubicacion']}}</td>
+      <td><div class="medidor">
+        <div class="pista"><div class="nivel {{'lleno' if pct>=100}}" style="width:{{[pct,100]|min}}%"></div></div>
+        <span class="cifra">{{lei}}/{{esp}}</span></div></td>
+      <td>{% if esp>0 and lei>=esp %}<span class="tag ok">completo</span>
+      {% elif lei>0 %}<span class="tag warn">parcial</span>
+      {% else %}<span class="tag bad">faltante</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

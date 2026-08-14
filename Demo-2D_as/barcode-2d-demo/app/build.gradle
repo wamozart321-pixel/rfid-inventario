@@ -1,0 +1,72 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.barcode2ds'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.barcode2ds"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.5"
+
+//        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('/release.jks')
+            storePassword '123456'
+            keyPassword '123456'
+            keyAlias 'release'
+        }
+        release {
+            storeFile file('/release.jks')
+            storePassword '123456'
+            keyPassword '123456'
+            keyAlias 'release'
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+
+        debug {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+
+        // 自定义apk名称
+        android.applicationVariants.all { variant ->
+            variant.outputs.all {
+                outputFileName = "barcode-2d-demo_v${defaultConfig.versionName}_${variant.buildType.name}.apk"
+            }
+        }
+    }
+
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.aar'])
+
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+}

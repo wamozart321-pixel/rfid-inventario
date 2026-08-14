@@ -1,0 +1,31 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block titulo %}Inventario RFID{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" type="image/png" href="/static/favicon.png">
+</head><body>
+<header>
+  <div class="brand">
+    <div class="chip">))</div>
+    <div><b>INVENTARIO&nbsp;RFID</b><small>C72 · ZEBRA ZT411</small></div>
+  </div>
+  <nav>
+    <a href="/" class="{{'on' if pg=='home'}}">Panel</a>
+    <a href="/productos" class="{{'on' if pg in ('productos','imprimir')}}">Productos</a>
+    <a href="/sesiones" class="{{'on' if pg in ('sesiones','sesion')}}">Conteos</a>
+    <a href="/captura" class="{{'on' if pg=='captura'}}">Captura rápida</a>
+    <a href="/desconocidos" class="{{'on' if pg=='desconocidos'}}">Desconocidos{% if nd %} <span class="tag warn">{{nd}}</span>{% endif %}</a>
+    <a href="/config" class="{{'on' if pg=='config'}}">Configuración</a>
+  </nav>
+  <div class="hdr-estado">
+    <span class="punto" id="dot-sesion"></span><span id="txt-sesion">—</span>
+    <span id="reloj"></span>
+  </div>
+</header>
+<main>
+{% if msg %}<div class="msg {{'err' if msg and msg.startswith('✖')}}">{{msg}}</div>{% endif %}
+{% block body %}{% endblock %}
+</main>
+<footer>impresora {{c['impresora_ip']}}:{{c['impresora_puerto']}} · {{c['dpi']}} dpi · etiqueta {{c['etiqueta_ancho_mm']}}×{{c['etiqueta_alto_mm']}} mm{% if c['codificar_rfid'] %} · codificación RFID activa{% endif %}</footer>
+<script src="/static/app.js"></script>
+</body></html>

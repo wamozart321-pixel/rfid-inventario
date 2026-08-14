@@ -1,0 +1,9 @@
+COLOCA AQUÍ EL SDK DE CHAINWAY
+==============================
+1. Descarga el SDK de la C72 desde https://www.chainway.net (Support > Download)
+   o pídelo a tu distribuidor. El archivo se llama algo como:
+      DeviceAPI_ver20240XXX_release.jar
+2. Copia el .jar (y cualquier .so/.aar que incluya) en esta carpeta app/libs/
+   - Si el SDK trae carpetas armeabi-v7a/arm64-v8a con archivos .so,
+     cópialas en app/src/main/jniLibs/
+3. Abre el proyecto en Android Studio, Sync Gradle, y compila (Build > APK).

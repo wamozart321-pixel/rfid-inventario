@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($sp = \"C:\\\\Users\\\\DISEO~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-DISE-O-Downloads-rfid-inventario\\\\d6a88f6e-ab90-4342-b1c7-6dff614a916d\\\\scratchpad\"; New-Item -ItemType Directory -Force \"$sp\\\\chainway\" | Out-Null; Invoke-WebRequest -Uri \"https://www.chainway.net/download/SDKs-Android/Demo-uhf_as.rar\" -OutFile \"$sp\\\\chainway\\\\Demo-uhf_as.rar\" -UserAgent \"Mozilla/5.0\"; Get-Item \"$sp\\\\chainway\\\\Demo-uhf_as.rar\" | Select-Object Length)"
+    ]
+  }
+}

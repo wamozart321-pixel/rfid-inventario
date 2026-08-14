@@ -1,0 +1,65 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>Productos</h1>
+<span class="sub">{{rows|length}} registrados</span></div>
+
+<div class="formfila" style="margin-bottom:14px">
+  <a class="btn" href="/productos">Catálogo</a>
+  <a class="btn sec" href="/imprimir">⎙ Impresión</a>
+</div>
+
+<div class="card">
+  <h3>Nuevo producto</h3>
+  <form method="post" class="formfila">
+    <input name="sku" placeholder="SKU / código de barras" required style="width:160px">
+    <input name="nombre" placeholder="Nombre " required style="flex:1;min-width:180px">
+    <input name="oem" placeholder="OEM / referencias" style="width:180px">
+    <input name="ubicacion" placeholder="Ubicación" style="width:130px">
+    <input name="cantidad" type="number" min="0" placeholder="Cant. esperada" style="width:130px">
+    <button>+ Agregar</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="formfila" style="margin-bottom:12px">
+    <input id="buscar" placeholder="Buscar por SKU, nombre o ubicación…" style="flex:1;min-width:220px">
+  </div>
+  <div class="tablewrap">
+  <table id="tabla-prod">
+    <thead><tr><th>SKU</th><th>Nombre</th><th>Ubicación</th>
+    <th class="num">Cantidad</th><th class="num">Tags</th><th>Asociar tag</th><th></th></tr></thead>
+    <tbody>
+    {% for p in rows %}
+    <tr data-q="{{(p['sku']~' '~p['nombre']~' '~p['ubicacion'])|lower}}">
+      <td class="mono">{{p['sku']}}</td>
+      <td>{{p['nombre']}}</td>
+      <td>{{p['ubicacion']}}</td>
+      <td class="num">
+        <form class="inline" method="post" action="/productos/{{p['id']}}/cantidad" style="flex-wrap:nowrap">
+          <button class="mini sec" name="delta" value="-1" title="quitar 1">−</button>
+          <input name="valor" type="number" min="0" value="{{p['cantidad_esperada']}}"
+                 style="width:64px" title="escribe la cantidad y pulsa ✓">
+          <button class="mini sec" name="delta" value="+1" title="agregar 1">+</button>
+          <button class="mini" name="delta" value="set" title="fijar esta cantidad">✓</button>
+        </form>
+      </td>
+      <td class="num">{{p['n_tags']}}</td>
+      <td>
+        <form class="inline" method="post" action="/productos/{{p['id']}}/tag">
+          <input name="epc" class="mono" placeholder="Asociar EPC…" style="width:190px">
+          <button class="mini sec">+ tag</button>
+        </form>
+      </td>
+      <td><form class="inline" method="post" action="/productos/{{p['id']}}/borrar"
+        onsubmit="return confirm('¿Borrar {{p[',sku,']}} y sus tags?')">
+        <button class="rojo mini" title="Borrar">✕</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if not rows %}<div class="vacio">Todavía no hay productos. Agrega el primero arriba.</div>{% endif %}
+</div>
+<p class="ayuda">En <b>Cantidad</b>: − y + ajustan de a una unidad (ventas, entradas);
+escribe un número y pulsa ✓ para fijarlo. Para imprimir etiquetas usa la pestaña
+<a href="/imprimir">⎙ Impresión</a>.</p>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>Panel de operación</h1>
+<span class="sub">se actualiza solo cada 3&nbsp;segundos</span></div>
+
+<div class="kpis">
+  <div class="kpi"><b id="k-prod">{{productos}}</b><span>Productos</span></div>
+  <div class="kpi"><b id="k-tags">{{tags}}</b><span>Tags asociados</span></div>
+  <div class="kpi acc"><b id="k-leidos">{{leidos}}</b><span>Leídos en sesión</span></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h3>Antena · últimas lecturas</h3>
+    <div class="antena" style="margin-bottom:10px">
+      <div class="radar {{'quieto' if not sesion}}" id="radar"><em></em><em></em><i></i></div>
+      <div>
+        {% if sesion %}
+          Sesión activa: <b>{{sesion['nombre']}}</b><br>
+          <a href="/sesiones/{{sesion['id']}}">ver avance del conteo →</a>
+        {% else %}
+          No hay sesión de conteo abierta.<br><a href="/sesiones">abrir una →</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="feed" id="feed"><div class="vacio">Cargando…</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Cómo conectar</h3>
+    <p><b>Pistola C72 (app):</b> botón ⚙ → URL <span class="mono">http://IP-DE-ESTE-PC:5000</span>, luego gatillo y <b>Enviar</b>.</p>
+    <p><b>Cualquier lector en modo teclado:</b> abre <a href="/captura">Captura rápida</a> en el navegador del equipo y dispara.</p>
+    <p><b>Otros sistemas:</b> <span class="mono">POST /api/lecturas</span> con <span class="mono">{"dispositivo":"X","epcs":[…]}</span>.</p>
+    <p class="ayuda">Las lecturas caen en la sesión de conteo activa; si no hay ninguna, se crea una automáticamente.</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,180 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="app_name">UHF</string>
+	<string name="rdoBtn_singleScan">Single</string>
+	<string name="rdoBtn_continuous">Auto</string>
+	<string name="chkAnti">Anti</string>
+	<string name="btnScan">Start</string>
+	<string name="tab_Scan">Scan</string>
+	<string name="tab_WriteData">Write</string>
+	<string name="tab_ReadData">Read</string>
+	<string name="tab_set">Config</string>
+	<string name="btnClear">Clear</string>
+	<string name="tvTotal">Total</string>
+	<string name="tvBank">Bank:</string>
+	<string name="tvAddress">Ptr:</string>
+	<string name="tvPassword">Access Pwd:</string>
+	<string name="tvLeng">Len:</string>
+	<string name="tvData">Data:</string>
+	<string name="btnReadData">Read</string>
+	<string name="btnSetFre">FrequencySet</string>
+    <string name="btnGetFre">Read Frequency</string>
+    <string name="btnGetPower">Read power</string>
+    <string name="btnSetPower">PowerSet</string>   
+    <string name="tvTime">Work</string>
+    <string name="tvWait">Wait</string>
+    <string name="btnGetTime">Read Pwn</string>
+    <string name="btnSetTime">PwmSet</string>
+    <string name="tvWorkMode">Frequency</string>
+    <string name="tvPower">power</string>
+    <string name="tvQValues">Q value:</string>
+    <string name="tvTagUii">Tag</string>
+    <string name="tvTagLen">Leng</string>
+    <string name="tvTagCount">num</string>
+    <string name="btnWriteData">Write</string>
+  <string name="btnSetSession">Set Session</string>
+  <string name="btnGetSession">Get Session</string>
+  <string name="tvSession">Session ID</string>
+  <string name="tvInventoried">Inventoried Flag</string>
+  <string name="btnFilter">Filter</string>
+  <string name="tvPtr">Start Add.</string>
+  <string name="tvLen">Length</string>
+  <string name="tvData2">Data</string>
+    <!--
+    <string name="app_name">UHF</string>
+	<string name="rdoBtn_singleScan">单步</string>
+	<string name="rdoBtn_continuous">循环</string>
+	<string name="chkAnti">防碰撞</string>
+	<string name="btnScan">扫描</string>
+	<string name="tab_Scan">扫描</string>
+	<string name="tab_WriteData">写数据</string>
+	<string name="tab_ReadData">读数据</string>
+	<string name="tab_set">设置</string>
+	<string name="btnClear">清空</string>
+	<string name="tvTotal">标签数</string>
+	<string name="tvBank">存储区</string>
+	<string name="tvAddress">地址</string>
+	<string name="tvPassword">访问密码</string>
+	<string name="tvLeng">长度</string>
+	<string name="tvData">数据内容</string>
+	<string name="btnReadData">读取数据</string>
+	<string name="btnSetFre">设置频率</string>
+    <string name="btnGetFre">获取频率</string>
+    <string name="btnGetPower">获取功率</string>
+    <string name="btnSetPower">设置功率</string>   
+    <string name="tvTime">时间</string>
+    <string name="tvWait">等待</string>
+    <string name="btnGetTime">获取空占比</string>
+    <string name="btnSetTime">设置空占比</string>
+    <string name="tvWorkMode">工作模式</string>
+    <string name="tvPower">功率</string>
+    <string name="tvQValues">Q值:</string>
+    <string name="tvTagUii">Tag</string>
+    <string name="tvTagLen">Leng</string>
+    <string name="tvTagCount">num</string>
+    -->
+<string-array name="arrayAntiQ">
+	    <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+        <item>14</item>
+        <item>15</item>
+</string-array>
+
+ <string-array name="arrayBank">
+        <item>RESERVED</item>
+        <item>EPC</item>
+        <item>TID</item>
+        <item>USER</item>
+ </string-array>
+  <string-array name="arraySession">
+    <item>S0</item>
+    <item>S1</item>
+    <item>S2</item>
+    <item>S3</item>
+  </string-array>
+
+  <string-array name="arrayInventoried">
+    <item>A</item>
+    <item>B</item>
+  </string-array>
+
+  <string name="China_Standard_plus">China Standard plus(920~925MHz)</string>
+  <string name="ETSI_Standard">ETSI Standard(865~868MHz)</string>
+  <string name="United_States_Standard">United States Standard(902~928MHz)</string>
+  <string name="Fixed_Frequency_915MHz">Fixed Frequency(915MHz)</string>
+  <string name="China_Standard_840_845MHz">China Standard(840~845MHz)</string>
+  <string name="China_Standard_920_925MHz">China Standard(920~925MHz)</string>
+  <string name="vietnam_918_923MHz">Vietnam(918~923MHz)</string>
+  <string name="South_Africa_915_919MHz">South Africa(915~919MHz)</string>
+  <string name="Korea">Korea</string>
+  <string name="Japan">Japan</string>
+  <string name="Morocco">Morocco</string>
+  <string name="Russia_860_867MHZ">Russia( 860MHz-867.6MHz)</string>
+  <string name="TAIWAN">Taiwan</string>
+  <string name="Peru_915_928MHz">Peru(915MHz-928MHz)</string>
+
+ 
+
+   <string-array name="arrayMode">
+        <item>@string/China_Standard_840_845MHz</item>
+        <item>@string/China_Standard_920_925MHz</item>
+        <item>@string/ETSI_Standard</item>
+        <item>@string/United_States_Standard</item>
+        <item>@string/Korea</item>
+        <item>@string/Japan</item>
+        <item>@string/South_Africa_915_919MHz</item>
+        <item>@string/TAIWAN</item>
+        <item>@string/vietnam_918_923MHz</item>
+        <item>@string/Peru_915_928MHz</item>
+        <item>@string/Russia_860_867MHZ</item>
+        <item>@string/Morocco</item>
+  </string-array>
+
+    <string-array name="arrayPower">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+        <item>14</item>
+        <item>15</item>
+        <item>16</item>
+        <item>17</item>
+        <item>18</item>
+        <item>19</item>
+        <item>20</item>
+        <item>21</item>
+        <item>22</item>
+        <item>23</item>
+        <item>24</item>
+        <item>25</item>
+        <item>26</item>
+        <item>27</item>
+        <item>28</item>
+        <item>29</item>
+        <item>30</item>
+    </string-array>
+
+ </resources>
+
+

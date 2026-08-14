@@ -1,0 +1,31 @@
+# --- Archivos que se vuelven a generar solos (no vale la pena subirlos) ---
+
+# Python
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+
+# Android / Gradle
+.gradle/
+local.properties
+*.iml
+captures/
+
+# Visual Studio / Xamarin
+.vs/
+bin/
+obj/
+packages/
+
+# Editores
+.idea/
+
+# Copias de seguridad automáticas de la base de datos
+servidor/respaldos/
+
+# Temporales de Windows
+Thumbs.db
+desktop.ini
+~$*

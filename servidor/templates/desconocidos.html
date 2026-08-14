@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>EPC desconocidos</h1>
+<span class="sub">{{rows|length}} pendientes de revisar</span></div>
+
+<div class="card">
+  <p style="color:var(--dim)">Aquí cae todo lo que la pistola lee y el sistema no reconoce.
+  Escribe el SKU y pulsa <b>Asociar</b> para asignarlo a su producto, o <b>Ignorar</b>
+  si es una etiqueta ajena (mercancía de paso, tag de otro negocio) para que no vuelva
+  a aparecer ni afecte los conteos.</p>
+  <div class="formfila" style="margin-bottom:12px">
+    <input id="buscar" placeholder="Buscar por EPC o equipo…" style="flex:1;min-width:220px">
+  </div>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>EPC</th><th class="num">Veces leído</th><th>Última vez</th>
+    <th>Equipo</th><th>Asignar a producto</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr data-q="{{(r['epc']~' '~r['dispositivo'])|lower}}">
+      <td class="mono">{{r['epc']}}</td>
+      <td class="num">{{r['veces']}}</td>
+      <td>{{r['ultima'][:16].replace('T',' ')}}</td>
+      <td>{{r['dispositivo']}}</td>
+      <td>
+        <form class="inline" method="post">
+          <input type="hidden" name="epc" value="{{r['epc']}}">
+          <input name="sku" placeholder="SKU del producto" style="width:170px">
+          <button class="mini">Asociar</button>
+          <button class="mini sec" name="accion" value="ignorar"
+                  onclick="return confirm('¿Marcar {{r['epc']}} como ignorado?')">Ignorar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if not rows %}<div class="vacio">Nada pendiente: todo lo leído está identificado ✔</div>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/tvWorkMode" />
+        <Spinner
+            android:id="@+id/spnWorkMode"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:entries="@array/arrayMode" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnGetFre"
+            android:layout_height="wrap_content"
+            android:text="@string/btnGetFre"
+            android:layout_width="160dp" />
+        <Button
+            android:id="@+id/btnSetFre"
+            android:text="@string/btnSetFre"
+            android:layout_height="wrap_content"
+            android:layout_width="160dp" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/tvPower" />
+        <Spinner
+            android:id="@+id/spnPower"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:entries="@array/arrayPower" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnGetPower"
+            android:layout_height="wrap_content"
+            android:text="@string/btnGetPower"
+            android:layout_width="160dp" />
+        <Button
+            android:id="@+id/btnSetPower"
+            android:layout_height="wrap_content"
+            android:text="@string/btnSetPower"
+            android:layout_width="160dp" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/lvR2000"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+ 
+     
+
+    <!--设置session-->
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/tvSession" />
+            <Spinner
+                android:id="@+id/spnSession"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:entries="@array/arraySession" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/tvInventoried" />
+            <Spinner
+                android:id="@+id/spnInventoried"
+                android:layout_height="wrap_content"
+                android:layout_width="wrap_content"
+                android:entries="@array/arrayInventoried" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btnSetSession"
+                android:layout_height="wrap_content"
+                android:text="@string/btnSetSession"
+                android:layout_width="160dp" />
+            <Button
+                android:id="@+id/btnGetSession"
+                android:layout_height="wrap_content"
+                android:text="@string/btnGetSession"
+                android:layout_width="160dp" />
+        </LinearLayout>
+
+
+	     <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <CheckBox
+                android:text="EPC And TID"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:id="@+id/checkBox1" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

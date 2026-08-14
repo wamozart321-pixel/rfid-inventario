@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Una fila por REPUESTO: nombre + cantidad leída (naranja) + veces leído (blanco) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal" android:gravity="center_vertical"
+    android:paddingTop="7dp" android:paddingBottom="7dp"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+
+    <TextView android:id="@+id/fNombre"
+        android:textColor="#E8EDF2" android:textSize="14sp"
+        android:maxLines="2" android:ellipsize="end"
+        android:layout_width="0dp" android:layout_weight="1"
+        android:layout_height="wrap_content"/>
+
+    <TextView android:id="@+id/fCant"
+        android:textColor="#F5A623" android:textSize="20sp" android:textStyle="bold"
+        android:gravity="right" android:maxLines="1"
+        android:layout_width="56dp" android:layout_height="wrap_content"/>
+
+    <TextView android:id="@+id/fVeces"
+        android:textColor="#FFFFFF" android:textSize="13sp"
+        android:gravity="right" android:maxLines="1" android:layout_marginLeft="4dp"
+        android:layout_width="56dp" android:layout_height="wrap_content"/>
+</LinearLayout>

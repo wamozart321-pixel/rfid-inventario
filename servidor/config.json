@@ -1,0 +1,217 @@
+{
+  "impresora_ip": "192.168.0.14",
+  "impresora_puerto": 9100,
+  "dpi": 203,
+  "etiqueta_ancho_mm": 50.0,
+  "etiqueta_alto_mm": 39.0,
+  "codificar_rfid": true,
+  "oscuridad": 27,
+  "velocidad": 3,
+  "papel_tipo": "",
+  "zebra_impresora_win": "Zebra ZT411 (203 dpi)",
+  "nombre_empresa": "www.repuestosvolkswagen.com",
+  "bartender": false,
+  "bartender_exe": "C:\\Program Files\\Seagull\\BarTender 2022\\bartend.exe",
+  "bartender_plantilla": "C:\\Users\\DISEÑO\\Downloads\\rfid-inventario\\servidor\\plantilla.btw",
+  "bartender_impresora": "",
+  "diseno": {
+    "borde": {
+      "on": false
+    },
+    "codigo": {
+      "alto": 36,
+      "on": true,
+      "x": 6,
+      "y": 40.5
+    },
+    "epc": {
+      "on": true,
+      "s": 18,
+      "x": 0.8,
+      "y": 1.2
+    },
+    "foto": {
+      "alto": 44,
+      "ancho": 37,
+      "on": true,
+      "x": 60,
+      "y": 40
+    },
+    "nombre": {
+      "alin": "C",
+      "ancho": 100,
+      "lineas": 0,
+      "on": true,
+      "s": 74,
+      "x": 0,
+      "y": 14.2
+    },
+    "oem": {
+      "alin": "C",
+      "ancho": 100,
+      "on": true,
+      "s": 34,
+      "x": 0,
+      "y": 2.7
+    },
+    "precio": {
+      "on": false,
+      "s": 46,
+      "x": 62,
+      "y": 46
+    },
+    "raya1": {
+      "ancho": 95,
+      "on": true,
+      "x": 2.5,
+      "y": 10.5
+    },
+    "raya2": {
+      "ancho": 95,
+      "on": true,
+      "x": 2.5,
+      "y": 36
+    },
+    "recuadro": {
+      "alto": 28,
+      "ancho": 40,
+      "grosor": 2,
+      "on": false,
+      "x": 55,
+      "y": 42
+    },
+    "texto1": {
+      "on": false,
+      "s": 30,
+      "texto": "TEXTO LIBRE 1",
+      "x": 5,
+      "y": 55
+    },
+    "texto2": {
+      "on": false,
+      "s": 30,
+      "texto": "TEXTO LIBRE 2",
+      "x": 5,
+      "y": 64
+    },
+    "ubicacion": {
+      "on": true,
+      "s": 22,
+      "x": 61.02597402597403,
+      "y": 80.41608876560333
+    },
+    "web": {
+      "alin": "C",
+      "ancho": 100,
+      "on": true,
+      "s": 58,
+      "x": 0,
+      "y": 91,
+      "letra": "ancha"
+    }
+  },
+  "sat_ip": "192.168.0.18",
+  "sat_puerto": 9100,
+  "sat_dpi": 203,
+  "sat_ancho_mm": 50.0,
+  "sat_alto_mm": 39.0,
+  "sat_gap_mm": 3.0,
+  "sat_lenguaje": "tspl",
+  "sat_oscuridad": 8,
+  "sat_papel_tipo": "gap",
+  "sat_impresora_win": "SAT TT448-2 USE",
+  "sat_doble": true,
+  "sat_sep_mm": 3.9,
+  "sat_lado": "ambas",
+  "respaldo_activo": true,
+  "respaldo_hora": "05:20",
+  "respaldo_carpeta": "",
+  "respaldo_dias": 30,
+  "costo_descuento": 48,
+  "diseno_desc": {
+    "borde": {
+      "on": false
+    },
+    "codigo": {
+      "alto": 26,
+      "on": false,
+      "x": 6,
+      "y": 52
+    },
+    "nombre": {
+      "alin": "L",
+      "ancho": 94,
+      "fuente": "arial",
+      "lineas": 0,
+      "negrita": true,
+      "on": true,
+      "s": 110,
+      "x": 3,
+      "y": 15
+    },
+    "oem": {
+      "alin": "L",
+      "ancho": 94,
+      "on": false,
+      "s": 40,
+      "x": 3,
+      "y": 72
+    },
+    "precio": {
+      "on": false,
+      "s": 46,
+      "x": 66,
+      "y": 2.5
+    },
+    "recuadro": {
+      "alto": 28,
+      "ancho": 40,
+      "grosor": 2,
+      "on": false,
+      "x": 55,
+      "y": 42
+    },
+    "sku": {
+      "alin": "C",
+      "ancho": 91.6139240506329,
+      "letra": "",
+      "on": true,
+      "s": 58,
+      "x": 4.193037974683548,
+      "y": 2.094320486815416
+    },
+    "texto1": {
+      "on": false,
+      "s": 40,
+      "texto": "TEXTO LIBRE 1",
+      "x": 5,
+      "y": 55
+    },
+    "texto2": {
+      "on": false,
+      "s": 40,
+      "texto": "TEXTO LIBRE 2",
+      "x": 5,
+      "y": 64
+    },
+    "ubicacion": {
+      "on": false,
+      "s": 36,
+      "x": 3,
+      "y": 80
+    },
+    "web": {
+      "alin": "C",
+      "ancho": 100,
+      "fuente": "arial",
+      "inv": true,
+      "letra": "ancha",
+      "negrita": true,
+      "on": true,
+      "s": 54,
+      "x": 0,
+      "y": 91.89999999999996
+    }
+  },
+  "fotos_ruta": "\\\\WIN-I56F313Q7LR\\imagenes repuestos"
+}

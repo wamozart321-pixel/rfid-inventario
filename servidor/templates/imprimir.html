@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>Impresión de etiquetas</h1>
+<span class="sub">busca el producto, pon las copias e imprime</span></div>
+
+<div class="formfila" style="margin-bottom:14px">
+  <a class="btn sec" href="/productos">Catálogo</a>
+  <a class="btn" href="/imprimir">⎙ Impresión</a>
+</div>
+
+<div class="card">
+  <div class="formfila" style="margin-bottom:12px">
+    <input id="buscar" placeholder="Buscar por SKU, nombre u OEM…" style="flex:1;min-width:220px">
+  </div>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>SKU</th><th>Producto</th><th>OEM</th>
+    <th class="num">Tags</th><th>Copias</th><th></th></tr></thead>
+    <tbody>
+    {% for p in rows %}
+    <tr data-q="{{(p['sku']~' '~p['nombre']~' '~(p['oem'] or ''))|lower}}">
+      <td class="mono">{{p['sku']}}</td>
+      <td>{{p['nombre']}}</td>
+      <td class="mono">{{p['oem']}}</td>
+      <td class="num">{{p['n_tags']}}</td>
+      <td colspan="2">
+        <form class="inline" method="post" action="/productos/{{p['id']}}/imprimir" style="flex-wrap:nowrap">
+          <input type="hidden" name="volver" value="imprimir">
+          <input name="copias" type="number" value="1" min="1" style="width:64px">
+          <button class="mini">⎙ Imprimir</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if not rows %}<div class="vacio">No hay productos. Créalos primero en el Catálogo.</div>{% endif %}
+</div>
+<p class="ayuda">Cada copia sale con el diseño impreso y el chip RFID grabado con un EPC único
+(la referencia del producto va dentro del número) y queda asociada automáticamente:
+imprimir, pegar y listo. La columna "Tags" muestra cuántas etiquetas tiene ya cada producto.</p>
+{% endblock %}

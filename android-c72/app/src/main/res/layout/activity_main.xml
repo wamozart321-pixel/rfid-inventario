@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:padding="12dp"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#14181D">
+
+    <TextView android:id="@+id/estado" android:text="Iniciando lector…"
+        android:textColor="#8695A5" android:textSize="14sp"
+        android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+    <TextView android:id="@+id/contador" android:text="0"
+        android:textColor="#F5A623" android:textSize="52sp" android:textStyle="bold"
+        android:gravity="center" android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button android:id="@+id/btnLeer" android:text="▶ LEER"
+        android:textSize="20sp" android:backgroundTint="#F5A623" android:textColor="#14181D"
+        android:layout_width="match_parent" android:layout_height="64dp"/>
+
+    <Button android:id="@+id/btnCodigo" android:text="▦ CÓDIGO DE BARRAS"
+        android:textSize="16sp" android:backgroundTint="#4A90D9" android:textColor="#FFFFFF"
+        android:layout_marginTop="6dp"
+        android:layout_width="match_parent" android:layout_height="52dp"/>
+
+    <LinearLayout android:orientation="horizontal" android:layout_marginTop="6dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:id="@+id/btnEnviar" android:text="ENVIAR" android:textSize="15sp"
+            android:maxLines="1" android:backgroundTint="#2E7D32" android:textColor="#FFFFFF"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="52dp"/>
+        <Button android:id="@+id/btnAsociar" android:text="ASOCIAR" android:textSize="15sp"
+            android:maxLines="1"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="52dp"/>
+    </LinearLayout>
+
+    <LinearLayout android:orientation="horizontal"
+        android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:id="@+id/btnLimpiar" android:text="LIMPIAR" android:textSize="13sp"
+            android:maxLines="1"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="46dp"/>
+        <Button android:id="@+id/btnDesc" android:text="¿?" android:textSize="13sp"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="46dp"/>
+        <Button android:id="@+id/btnConfig" android:text="⚙" android:textSize="13sp"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="46dp"/>
+    </LinearLayout>
+
+    <Button android:id="@+id/btnFiltro" android:text="◎ LEER SOLO UN PRODUCTO"
+        android:textSize="14sp" android:backgroundTint="#37474F" android:textColor="#FFFFFF"
+        android:layout_marginTop="6dp"
+        android:layout_width="match_parent" android:layout_height="44dp"/>
+
+    <Button android:id="@+id/bannerDesc" android:text="¿? Desconocidos: 0"
+        android:visibility="gone" android:backgroundTint="#7A4A00" android:textColor="#FFD9A0"
+        android:textSize="14sp" android:layout_marginTop="6dp"
+        android:layout_width="match_parent" android:layout_height="44dp"/>
+
+    <LinearLayout android:orientation="horizontal" android:layout_marginTop="8dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:text="REPUESTO" android:textColor="#6B7A8A" android:textSize="11sp"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
+        <TextView android:text="CANT." android:textColor="#F5A623" android:textSize="11sp"
+            android:gravity="right"
+            android:layout_width="56dp" android:layout_height="wrap_content"/>
+        <TextView android:text="VECES" android:textColor="#FFFFFF" android:textSize="11sp"
+            android:gravity="right" android:layout_marginLeft="4dp"
+            android:layout_width="56dp" android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <ListView android:id="@+id/lista"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:layout_marginTop="2dp"/>
+</LinearLayout>

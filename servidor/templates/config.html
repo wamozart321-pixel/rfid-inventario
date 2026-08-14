@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>Configuración</h1></div>
+
+<div class="card" style="max-width:680px">
+  <h3>Impresora Zebra y etiqueta</h3>
+  <form method="post">
+    <table class="cfg-tabla">
+      <tr><td>IP de la impresora</td>
+        <td><input name="impresora_ip" value="{{c['impresora_ip']}}" required></td></tr>
+      <tr><td>Puerto</td>
+        <td><input name="impresora_puerto" value="{{c['impresora_puerto']}}" style="width:110px"></td></tr>
+      <tr><td>Resolución (dpi)</td>
+        <td><select name="dpi">
+          {% for d in [203,300,600] %}
+          <option value="{{d}}" {{'selected' if c['dpi']==d}}>{{d}}</option>
+          {% endfor %}</select>
+        <span class="ayuda">según tu modelo de ZT411</span></td></tr>
+      <tr><td>Etiqueta — ancho (mm)</td>
+        <td><input name="ancho" value="{{c['etiqueta_ancho_mm']}}" style="width:110px"></td></tr>
+      <tr><td>Etiqueta — alto (mm)</td>
+        <td><input name="alto" value="{{c['etiqueta_alto_mm']}}" style="width:110px"></td></tr>
+      <tr><td>Codificar RFID al imprimir<br>
+        <span class="ayuda">solo ZT411R con módulo RFID</span></td>
+        <td><label class="chk"><input type="checkbox" name="codificar_rfid"
+          {{'checked' if c['codificar_rfid']}}> grabar EPC en el inlay (^RFW)</label></td></tr>
+      <tr><td>Nombre en la etiqueta</td>
+        <td><input name="empresa" value="{{c['nombre_empresa']}}"></td></tr>
+      <tr><td colspan="2" style="padding-top:14px"><b>Integración BarTender</b>
+        <span class="ayuda">— imprime con tu diseño .btw tal cual (foto incluida)</span></td></tr>
+      <tr><td>Imprimir con BarTender</td>
+        <td><label class="chk"><input type="checkbox" name="bartender"
+          {{'checked' if c['bartender']}}> usar la plantilla .btw en vez del diseño propio</label></td></tr>
+      <tr><td>Programa (bartend.exe)</td>
+        <td><input name="bartender_exe" value="{{c['bartender_exe']}}"></td></tr>
+      <tr><td>Plantilla .btw</td>
+        <td><input name="bartender_plantilla" value="{{c['bartender_plantilla']}}"
+          placeholder="C:\...\servidor\plantilla.btw"></td></tr>
+      <tr><td>Impresora de Windows</td>
+        <td><input name="bartender_impresora" value="{{c['bartender_impresora']}}"
+          placeholder="vacío = la guardada en el diseño"></td></tr>
+    </table>
+    <div class="formfila" style="margin-top:14px">
+      <button name="accion" value="guardar">Guardar</button>
+      <button name="accion" value="probar" class="sec">⎙ Guardar y probar impresora</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="max-width:680px">
+  <h3>Conexión de pistolas</h3>
+  <p class="mono" style="font-size:13px">
+    POST /api/lecturas &nbsp;{"dispositivo":"C72-01","epcs":["E280…"]}<br>
+    POST /api/tags &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{"epc":"E280…","sku":"A1"}<br>
+    GET&nbsp; /api/estado
+  </p>
+  <p class="ayuda">La app de la C72 usa estos mismos endpoints. Cualquier otro lector programable puede integrarse igual, o usar Captura rápida en modo teclado.</p>
+</div>
+{% endblock %}

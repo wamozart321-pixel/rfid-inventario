@@ -1,0 +1,3412 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inventario RFID</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font:13px 'Segoe UI',Tahoma,sans-serif;color:#252423;background:#fff;
+     display:flex;flex-direction:column;overflow:hidden;user-select:none}
+/* ---------- tira de pestañas (estilo FactuSOL / Office) ---------- */
+#tira{display:flex;align-items:stretch;background:#fff;border-bottom:1px solid #E1DFDD;height:34px;flex:none}
+#marca{background:#E87722;color:#fff;font-weight:700;padding:0 16px;display:flex;align-items:center;
+       font-size:12.5px;letter-spacing:.5px;cursor:pointer;white-space:nowrap}
+#marca:hover{background:#D0641B}
+.tab{padding:0 20px;display:flex;align-items:center;cursor:pointer;color:#484644;font-size:13px}
+.tab:hover{color:#E87722}
+.tab.activa{color:#C25705;font-weight:600;box-shadow:inset 0 -2.5px 0 #E87722}
+#tira-info{margin-left:auto;display:flex;align-items:center;padding:0 14px;color:#A19F9D;font-size:11.5px;white-space:nowrap}
+/* ---------- cinta de opciones ---------- */
+.banda{display:flex;background:#F8F7F6;border-bottom:1px solid #D8D6D3;padding:4px 6px 2px;min-height:92px;flex:none;overflow-x:auto}
+.banda.oculta{display:none}
+.grupo{display:flex;flex-direction:column;padding:0 8px;border-right:1px solid #E4E2DF;flex:none}
+.g-bots{display:flex;gap:2px;flex:1;align-items:stretch}
+.g-tit{text-align:center;font-size:10.5px;color:#8A8886;padding:3px 2px 1px;white-space:nowrap}
+.bg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    min-width:62px;max-width:86px;padding:5px 7px;background:none;border:1px solid transparent;
+    border-radius:3px;cursor:pointer;font:11.5px 'Segoe UI';color:#3B3A39;line-height:1.15;text-align:center;position:relative}
+.bg:hover{background:#FDEBD9;border-color:#F5C9A4}
+.bg:active{background:#FBDCBE}
+.bg .ic{font-size:22px;line-height:1}
+.badge{position:absolute;top:1px;right:4px;background:#C4314B;color:#fff;border-radius:9px;
+       padding:1px 6px;font-size:10.5px;font-weight:700}
+#buscar{width:240px;padding:7px 10px;border:1px solid #C8C6C4;border-radius:3px;font:13px 'Segoe UI'}
+#buscar:focus{outline:2px solid #E87722;border-color:transparent}
+/* ---------- contenido / tablas ---------- */
+#contenido{flex:1;overflow:hidden;display:flex;background:#fff}
+.vista{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.vista.oculta{display:none}
+.twrap{flex:1;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12.8px}
+th{position:sticky;top:0;z-index:2;background:#F3F2F1;border-bottom:1px solid #C8C6C4;
+   border-right:1px solid #E7E5E3;padding:6px 10px;text-align:left;font-weight:600;color:#4C4A48;
+   cursor:pointer;white-space:nowrap}
+th.num,td.num{text-align:right}
+th.asc::after{content:' ▲';font-size:9px;color:#E87722}
+th.desc::after{content:' ▼';font-size:9px;color:#E87722}
+td{padding:5px 10px;border-bottom:1px solid #F0EEEC;white-space:nowrap;overflow:hidden;
+   text-overflow:ellipsis;max-width:430px}
+tbody tr{cursor:default}
+tbody tr:nth-child(even){background:#FAF9F8}
+tbody tr:hover{background:#F3F1EF}
+tbody tr.sel{background:#FCE0C6!important;box-shadow:inset 3px 0 0 #E87722}
+.mono{font-family:Consolas,monospace;font-size:12px}
+.ok{color:#107C10;font-weight:600}.falta{color:#C4314B;font-weight:600}.sobra{color:#2B579A;font-weight:600}
+/* cabeceras dentro de una vista */
+.cab{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#FBFAF9;
+     border-bottom:1px solid #E1DFDD;flex-wrap:wrap;flex:none}
+.cab input[type=text],.cab input:not([type]){padding:6px 9px;border:1px solid #C8C6C4;border-radius:3px;font:12.5px 'Segoe UI'}
+#barra-filtros select,#barra-filtros input[type=number]{padding:4px 6px;border:1px solid #C8C6C4;border-radius:3px;font:12px 'Segoe UI';color:#252423}
+#barra-filtros.activos{background:#FDF0E6}
+.chip{padding:2px 10px;border-radius:10px;font-size:11.5px;font-weight:600}
+.chip.abierta{background:#DFF6DD;color:#107C10}
+.chip.cerrada{background:#EDEBE9;color:#605E5C}
+.chip.total{background:#FDE7D2;color:#B34A00}
+.chip.verificacion{background:#DEECF9;color:#2B579A}
+.hint{font-size:12px;color:#8A8886;font-weight:400;line-height:1.45}
+/* ---------- barra de estado ---------- */
+#barra{background:#E87722;color:#fff;display:flex;align-items:center;gap:18px;
+       padding:4px 12px;font-size:12px;flex:none}
+#b-cont{white-space:nowrap;font-weight:600}
+#b-msg{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.95}
+#b-der{white-space:nowrap;font-weight:600}
+/* ---------- botones y modales ---------- */
+.btn{padding:6px 14px;border:1px solid #C8C6C4;background:#fff;border-radius:3px;cursor:pointer;
+     font:12.5px 'Segoe UI';color:#252423;white-space:nowrap}
+.btn:hover{background:#F3F2F1}
+.btn.prim{background:#E87722;border-color:#E87722;color:#fff;font-weight:600}
+.btn.prim:hover{background:#D0641B}
+.btn.rojo{background:#C4314B;border-color:#C4314B;color:#fff;font-weight:600}
+.btn.rojo:hover{background:#A82940}
+.btn.mini{padding:2px 10px;font-size:12px}
+.btn:disabled{opacity:.55;cursor:default}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;
+         justify-content:center;z-index:50}
+.modal{background:#fff;width:min(480px,92vw);max-height:88vh;overflow:auto;border-radius:6px;
+       box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.m-tit{background:#E87722;color:#fff;padding:9px 14px;font-weight:600;display:flex;align-items:center;
+       position:sticky;top:0}
+.m-x{margin-left:auto;cursor:pointer;padding:0 6px;font-weight:400}
+.m-x:hover{opacity:.75}
+.m-cuerpo{padding:14px 16px;display:flex;flex-direction:column;gap:10px;user-select:text}
+.m-cuerpo label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#5A5856;font-weight:600}
+.m-cuerpo input:not([type=checkbox]):not([type=radio]),.m-cuerpo select{
+    padding:7px 9px;border:1px solid #C8C6C4;border-radius:3px;font:13px 'Segoe UI';color:#252423;width:100%}
+.m-cuerpo input:focus{outline:2px solid #E87722;border-color:transparent}
+.m-cuerpo textarea{padding:7px 9px;border:1px solid #C8C6C4;border-radius:3px;
+    font:12.5px/1.45 'Segoe UI';color:#252423;width:100%;box-sizing:border-box;resize:vertical}
+.m-cuerpo textarea:focus{outline:2px solid #E87722;border-color:transparent}
+/* buscador de proveedor (se escribe para filtrar) */
+.combo-lista{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid #C8C6C4;
+    border-radius:0 0 4px 4px;max-height:190px;overflow:auto;z-index:20;
+    box-shadow:0 10px 24px rgba(0,0,0,.22)}
+.combo-lista div{padding:6px 10px;cursor:pointer;font-size:12.5px;font-weight:400;color:#252423}
+.combo-lista div:hover{background:#FDEEE2}
+.m-pie{display:flex;justify-content:flex-end;gap:8px;padding:4px 16px 14px}
+.fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.chk,.m-cuerpo label.radio{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:12.5px;color:#252423}
+label.chk input,.m-cuerpo label.radio input{width:auto!important}
+.toast{position:fixed;right:16px;bottom:44px;background:#323130;color:#fff;padding:11px 16px;
+       border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:60;max-width:62vw;
+       font-size:13px;display:none;user-select:text}
+/* panel del editor de diseño */
+.dis-sec{font-size:10.5px;font-weight:700;letter-spacing:.7px;color:#8A8886;margin:12px 0 5px}
+.dis-sec:first-child{margin-top:0}
+.dis-item{display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;
+          border:1px solid transparent;border-radius:4px;font-size:12.3px;cursor:pointer;
+          user-select:none;color:#8A8886}
+.dis-item:hover{background:#F3F1EF}
+.dis-item.on{background:#fff;border-color:#E7E5E3;color:#252423}
+.dis-item.sel{background:#FDEBD9;border-color:#F5C9A4}
+.dis-item input{width:auto!important;flex:none;accent-color:#E87722}
+.dis-item .di-ic{width:20px;text-align:center;flex:none;font-size:13px}
+/* etiqueta editable con render real de fondo */
+#dis-etq .real-img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#dis-etq [data-k]{z-index:2}
+#dis-etq.con-img .di-cont{opacity:0}
+#dis-etq.con-img [data-k]:hover{outline:1px dashed rgba(232,119,34,.55);outline-offset:2px}
+#dis-cargando{position:absolute;right:8px;top:8px;background:rgba(232,119,34,.92);color:#fff;
+  font-size:10.5px;padding:2px 8px;border-radius:9px;z-index:6;display:none}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-thumb{background:#D3D1CF;border-radius:6px;border:3px solid #fff}
+::-webkit-scrollbar-thumb:hover{background:#BDBBB9}
+</style>
+</head>
+<body>
+
+<!-- pestañas -->
+<div id="tira">
+  <div id="marca" onclick="acercaDe()">☰ INVENTARIO RFID</div>
+  <div class="tab activa" data-tab="productos">Productos</div>
+  {% if modo != 'vendedor' %}<div class="tab" data-tab="inventario">Inventario</div>{% endif %}
+  <div id="tira-info">{% if modo == 'vendedor' %}👁 SOLO CONSULTA (VENDEDORES) &nbsp;·&nbsp; {% elif modo == 'principal' %}🖥 PC PRINCIPAL &nbsp;·&nbsp; {% endif %}REPUESTOSVOLKSWAGENCOM SAS</div>
+</div>
+
+<!-- cinta: Productos -->
+<div class="banda" data-banda="productos">
+  <div class="grupo">
+    <div class="g-bots">
+      {% if modo != 'vendedor' %}<button class="bg" onclick="nuevoProducto()"><span class="ic">📦</span>Nuevo</button>{% endif %}
+      <button class="bg" onclick="infoProducto()" title="Doble clic en la fila también la abre"><span class="ic">ℹ️</span>Info</button>
+      {% if modo != 'vendedor' %}
+      <button class="bg" onclick="modificarProducto()" title="Clic derecho en la fila también lo abre"><span class="ic">✏️</span>Modificar</button>
+      <button class="bg" onclick="eliminarProducto()"><span class="ic">🗑️</span>Eliminar</button>
+      <button class="bg" onclick="importarExcel()"><span class="ic">⬆️</span>Importar</button>
+      <button class="bg" onclick="window.open('/api/exportar/productos')"
+              title="Excel con las mismas columnas que entiende Importar (sirve de plantilla)">
+        <span class="ic">⬇️</span>Exportar</button>
+      {% endif %}
+    </div>
+    <div class="g-tit">{{ 'Consulta' if modo == 'vendedor' else 'Mantenimiento' }}</div>
+  </div>
+  {% if modo != 'vendedor' %}
+  <div class="grupo">
+    <div class="g-bots">
+      <button class="bg" onclick="ajustar(1)"><span class="ic">➕</span>Sumar 1</button>
+      <button class="bg" onclick="ajustar(-1)"><span class="ic">➖</span>Restar 1</button>
+      <button class="bg" onclick="fijarCantidad()"><span class="ic">🔢</span>Fijar stock</button>
+    </div>
+    <div class="g-tit">Existencias</div>
+  </div>
+  <div class="grupo">
+    <div class="g-bots">
+      <button class="bg" onclick="imprimirSel()"><span class="ic">🖨️</span>Imprimir etiquetas</button>
+      <button class="bg" onclick="asociarTag()"><span class="ic">🔗</span>Asociar tag</button>
+      <button class="bg" onclick="verDiseno()"><span class="ic">🎨</span>Diseño etiqueta</button>
+      <button class="bg" onclick="revisarCodigos()"
+              title="Busca códigos de barras que ya no coinciden con el precio o el proveedor actual">
+        <span class="ic">🔎</span>Revisar códigos</button>
+    </div>
+    <div class="g-tit">Etiquetas RFID</div>
+  </div>
+  {% endif %}
+  <div class="grupo" style="flex:1;border-right:none">
+    <div class="g-bots" style="align-items:center;padding:0 4px">
+      <input id="buscar" placeholder="🔍 Buscar código, nombre, referencia (también aplicables), bodega…">
+    </div>
+    <div class="g-tit">Buscar</div>
+  </div>
+</div>
+
+<!-- cinta: Inventario (los vendedores no la ven) -->
+{% if modo != 'vendedor' %}
+<div class="banda oculta" data-banda="inventario">
+  <div class="grupo">
+    <div class="g-bots">
+      <button class="bg" onclick="verSesiones()"><span class="ic">📋</span>Sesiones de conteo</button>
+      <button class="bg" onclick="nuevaSesion()"><span class="ic">🆕</span>Nueva sesión</button>
+    </div>
+    <div class="g-tit">Conteos</div>
+  </div>
+  <div class="grupo">
+    <div class="g-bots">
+      <button class="bg" onclick="verDesconocidos()"><span class="ic">❓</span>Desconocidos
+        <span id="badge-desc" class="badge" style="display:none">0</span></button>
+      <button class="bg" onclick="actualizar()"><span class="ic">🔄</span>Actualizar</button>
+    </div>
+    <div class="g-tit">Revisión</div>
+  </div>
+  <div class="grupo">
+    <div class="g-bots">
+      <button class="bg" onclick="verVentas()"><span class="ic">🏆</span>Más vendidos</button>
+    </div>
+    <div class="g-tit">Estadísticas</div>
+  </div>
+  <div class="grupo">
+    <div class="g-bots">
+      {% if modo == 'principal' %}
+      <button class="bg" onclick="configUI()"><span class="ic">⚙️</span>Configuración</button>
+      {% endif %}
+      <button class="bg" onclick="acercaDe()"><span class="ic">📡</span>Pistola / Web</button>
+    </div>
+    <div class="g-tit">Sistema</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- contenido -->
+<div id="contenido">
+
+  <div class="vista" id="v-productos">
+    <div class="cab" id="barra-filtros" style="font-size:12px;gap:8px">
+      <span style="font-weight:600;color:#5A5856">🔎 Filtros:</span>
+      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Proveedor
+        <select id="fl-prov" onchange="aplicarFiltros()" style="max-width:150px"><option value="">todos</option></select></label>
+      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Bodega
+        <select id="fl-bod" onchange="aplicarFiltros()"><option value="">todas</option></select></label>
+      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Stock
+        <select id="fl-stock" onchange="aplicarFiltros()">
+          <option value="">cualquiera</option>
+          <option value="0">agotados (0)</option>
+          <option value="pos">con stock (&gt;0)</option>
+          <option value="bajo">stock bajo (1–5)</option>
+        </select></label>
+      <span style="display:flex;align-items:center;gap:3px;color:#5A5856">Precio
+        <input id="fl-pmin" type="number" min="0" placeholder="mín" style="width:72px" oninput="aplicarFiltros()">–
+        <input id="fl-pmax" type="number" min="0" placeholder="máx" style="width:72px" oninput="aplicarFiltros()"></span>
+      <span style="display:flex;align-items:center;gap:3px;color:#5A5856">Cant.
+        <input id="fl-cmin" type="number" min="0" placeholder="mín" style="width:58px" oninput="aplicarFiltros()">–
+        <input id="fl-cmax" type="number" min="0" placeholder="máx" style="width:58px" oninput="aplicarFiltros()"></span>
+      <label class="chk" style="font-size:12px"><input type="checkbox" id="fl-tag" onchange="aplicarFiltros()"> con etiqueta</label>
+      <label class="chk" style="font-size:12px"><input type="checkbox" id="fl-precio" onchange="aplicarFiltros()"> con precio</label>
+      <button class="btn" id="fl-limpiar" onclick="limpiarFiltros()" style="display:none">✖ Limpiar</button>
+      <span class="hint" id="fl-cuenta" style="margin-left:auto"></span>
+    </div>
+    <div class="twrap"><table id="t-productos">
+      <thead><tr>
+        <th data-c="sku" style="width:120px">Código</th>
+        <th data-c="nombre" class="asc">Nombre</th>
+        <th data-c="oem" style="width:140px">Ref. fábrica</th>
+        <th data-c="ubicacion" style="width:105px">Bodega</th>
+        <th data-c="precio_minimo" class="num" style="width:90px">P. mínimo</th>
+        <th data-c="precio" class="num" style="width:90px">Precio</th>
+        <th data-c="cantidad_esperada" class="num" style="width:75px">Stock</th>
+        <th data-c="n_tags" class="num" style="width:90px">Etiquetas</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <div class="vista oculta" id="v-sesiones">
+    <div class="cab">
+      <b>Sesiones de conteo</b>
+      <span class="hint">— haz clic en una sesión para ver su avance</span>
+      <button class="btn prim" style="margin-left:auto" onclick="nuevaSesion()">🆕 Nueva sesión</button>
+    </div>
+    <div class="twrap"><table id="t-sesiones">
+      <thead><tr>
+        <th style="width:55px">Nº</th><th>Nombre</th><th style="width:130px">Tipo</th>
+        <th style="width:95px">Estado</th><th class="num" style="width:95px">Lecturas</th>
+        <th style="width:145px">Creada</th><th style="width:55px"></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <div class="vista oculta" id="v-sesion">
+    <div class="cab">
+      <button class="btn" onclick="verSesiones()">← Sesiones</button>
+      <b id="ses-tit"></b><span id="ses-chips"></span>
+      <button class="btn" id="ses-btn-filtros" style="margin-left:auto"
+              onclick="toggleFiltrosSes()" title="Buscar y filtrar el avance">🔎 Filtros</button>
+      <button class="btn" onclick="window.open('/sesiones/'+sesionVista+'/excel')"
+              title="Solo productos (sin EPC desconocidos); se puede reimportar como conteo">⬇ Excel</button>
+      <button class="btn rojo" id="btn-cerrar-ses" onclick="cerrarSesionUI()">Cerrar sesión</button>
+    </div>
+    <div class="cab oculta" id="ses-filtros" style="font-size:12px;gap:8px">
+      <input id="ses-buscar" type="text" placeholder="🔍 SKU, nombre o código de barras…"
+             style="width:180px" oninput="renderResumen(true)">
+      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Bodega
+        <select id="ses-bod" onchange="renderResumen(true)"><option value="">todas</option></select></label>
+      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Diferencia
+        <select id="ses-dif" onchange="renderResumen(true)">
+          <option value="">cualquiera</option>
+          <option value="falta">faltan (−)</option>
+          <option value="sobra">sobran (+)</option>
+          <option value="ok">exactos (✔)</option>
+          <option value="leidos">con lecturas</option>
+          <option value="sin">sin leer aún</option>
+        </select></label>
+      <label class="chk" style="font-size:12px"><input type="checkbox" id="ses-mov" checked onchange="renderResumen(true)"> Solo con stock o lecturas</label>
+      <button class="btn" onclick="limpiarFiltrosSes()">✖ Limpiar</button>
+      <span class="hint" id="ses-cuenta" style="margin-left:auto"></span>
+    </div>
+    <div class="twrap"><table id="t-resumen">
+      <thead><tr>
+        <th style="width:130px">Código</th><th>Nombre</th><th style="width:120px">Bodega</th>
+        <th class="num" style="width:85px">Esperado</th><th class="num" style="width:85px">Contado</th>
+        <th class="num" style="width:95px">Diferencia</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <div class="vista oculta" id="v-diseno">
+    <div class="cab">
+      <b>🎨 Diseño de etiqueta</b>
+      <span style="display:flex;margin-left:12px;border:1px solid #C8C6C4;border-radius:6px;overflow:hidden">
+        <button class="btn prim" id="tab-dis-cb" style="border:0;border-radius:0"
+                onclick="tabDiseno('cb')">🏷️ Código de barras</button>
+        <button class="btn" id="tab-dis-desc" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+                onclick="tabDiseno('desc')">📝 Descripción</button>
+      </span>
+      <input id="dis-sku" placeholder="Referencia de muestra" style="margin-left:auto;width:150px"
+             onchange="verDiseno()">
+      <button class="btn" onclick="deshacer()" title="Deshacer (Ctrl+Z)">↶</button>
+      <button class="btn" onclick="zoomDis(-1)" title="Alejar">⊖</button>
+      <button class="btn" onclick="zoomDis(1)" title="Acercar">⊕</button>
+      <button class="btn" onclick="restaurarDiseno()">↺ Original</button>
+      <button class="btn" onclick="imprimirPrueba(this)">🖨 Imprimir prueba</button>
+      <button class="btn prim" onclick="guardarDiseno()">💾 Guardar diseño</button>
+    </div>
+    <div style="flex:1;display:flex;overflow:hidden">
+      <div id="dis-panel" style="width:250px;flex:none;overflow-y:auto;border-right:1px solid #E1DFDD;
+           padding:10px 12px;background:#FBFAF9"></div>
+      <div id="dis-lienzo" style="flex:1;overflow:auto;position:relative;background:#DEDBD7;
+           display:flex;padding:24px"></div>
+    </div>
+  </div>
+
+  <div class="vista oculta" id="v-ventas">
+    <div class="cab">
+      <b>🏆 Productos que más se venden</b>
+      <span style="display:flex;margin-left:12px;border:1px solid #C8C6C4;border-radius:6px;overflow:hidden">
+        <button class="btn" id="vta-dia" style="border:0;border-radius:0"
+                onclick="periodoVentas('dia')">Hoy</button>
+        <button class="btn prim" id="vta-mes" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+                onclick="periodoVentas('mes')">Este mes</button>
+        <button class="btn" id="vta-ano" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+                onclick="periodoVentas('ano')">Este año</button>
+      </span>
+      <span style="display:flex;margin-left:10px;border:1px solid #C8C6C4;border-radius:6px;overflow:hidden">
+        <button class="btn" id="vtg-barras" style="border:0;border-radius:0" title="Barras horizontales"
+                onclick="tipoGrafica('barras')">📊 Barras</button>
+        <button class="btn" id="vtg-columnas" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+                title="Columnas verticales" onclick="tipoGrafica('columnas')">📶 Columnas</button>
+        <button class="btn" id="vtg-torta" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+                title="Participación de cada producto" onclick="tipoGrafica('torta')">🥧 Torta</button>
+        <button class="btn" id="vtg-linea" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+                title="Ventas a lo largo del tiempo" onclick="tipoGrafica('linea')">📈 Línea</button>
+      </span>
+      <button class="btn" style="margin-left:auto" onclick="verVentas()">🔄 Actualizar</button>
+    </div>
+    <div id="vta-cuerpo" style="flex:1;overflow:auto;padding:16px 22px"></div>
+  </div>
+
+  <div class="vista oculta" id="v-desconocidos">
+    <div class="cab">
+      <b>Etiquetas desconocidas</b>
+      <span class="hint">— leídas por la pistola pero sin producto: asígnalas o ignóralas</span>
+      <button class="btn" style="margin-left:auto" onclick="verDesconocidos()">🔄 Actualizar</button>
+    </div>
+    <div class="twrap"><table id="t-desc">
+      <thead><tr>
+        <th>EPC</th><th class="num" style="width:85px">Veces</th>
+        <th style="width:155px">Última lectura</th><th style="width:190px">Acciones</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+</div>
+
+<!-- barra de estado -->
+<div id="barra">
+  <span id="b-cont"></span>
+  <span id="b-msg">Listo</span>
+  <span id="b-der">Pistola / celular: http://{{ ip }}:5000</span>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+const IP_PISTOLA = 'http://{{ ip }}:5000';
+
+/* ---------------- utilidades ---------------- */
+/* modo de esta ventana: '' = cliente (naranja) · 'principal' (rojo) ·
+   'vendedor' (verde, SOLO consulta: sin modificar ni imprimir) */
+const MODO = '{{ modo }}';
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const fmt = n => Number(n || 0).toLocaleString('es-CO');
+const fecha = t => t ? new Date(t).toLocaleString('es-CO',
+  {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+
+async function api(url, datos){
+  const r = await fetch(url, datos !== undefined
+    ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(datos)}
+    : {});
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error || j.msg || ('Error ' + r.status));
+  return j;
+}
+
+let toastT;
+function toast(m){
+  const t = document.getElementById('toast');
+  t.textContent = m; t.style.display = 'block';
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.style.display = 'none', 4500);
+  bmsg(m);
+}
+function bmsg(m){ document.getElementById('b-msg').textContent = m; }
+function bcont(m){ document.getElementById('b-cont').textContent = m; }
+
+function modal(titulo, cuerpo, botones){
+  const ov = document.createElement('div'); ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal"><div class="m-tit">${titulo}<span class="m-x">✕</span></div>
+    <div class="m-cuerpo">${cuerpo}</div><div class="m-pie"></div></div>`;
+  const pie = ov.querySelector('.m-pie');
+  (botones || []).forEach(b => {
+    const el = document.createElement('button');
+    el.textContent = b.t;
+    el.className = 'btn' + (b.p ? ' prim' : '') + (b.r ? ' rojo' : '');
+    el.onclick = () => { if(b.f) b.f(ov, el); else ov.remove(); };
+    pie.appendChild(el);
+  });
+  ov.querySelector('.m-x').onclick = () => ov.remove();
+  ov.addEventListener('mousedown', e => { if(e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+  const inp = ov.querySelector('input:not([type=checkbox]):not([type=radio])');
+  if(inp){ inp.focus(); inp.select && inp.select(); }
+  return ov;
+}
+
+/* ---------------- vistas y pestañas ---------------- */
+let vista = 'productos';
+function mostrarVista(v){
+  vista = v;
+  document.querySelectorAll('.vista').forEach(x => x.classList.add('oculta'));
+  document.getElementById('v-' + v).classList.remove('oculta');
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('activa'));
+  t.classList.add('activa');
+  document.querySelectorAll('.banda').forEach(b =>
+    b.classList.toggle('oculta', b.dataset.banda !== t.dataset.tab));
+  if(t.dataset.tab === 'productos'){ mostrarVista('productos'); cargarProductos(); }
+  else verSesiones();
+});
+function actualizar(){
+  if(vista === 'productos') cargarProductos();
+  else if(vista === 'sesiones') verSesiones();
+  else if(vista === 'sesion') cargarResumen();
+  else if(vista === 'desconocidos') verDesconocidos();
+  else if(vista === 'ventas') verVentas();
+}
+
+/* Busca por PALABRAS SUELTAS y en cualquier orden: escribiendo «pastillas t5»
+   encuentra "PASTILLA FRENO DEL T5 …" aunque no esté en ese orden ni seguido.
+   Además no distingue tildes ni singular/plural. */
+function sinTildes(s){
+  return String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+function raiz(p){
+  // "pastillas" -> "pastilla", "motores" -> "motor": buscando la raíz, una
+  // palabra en singular o en plural encuentra las dos formas
+  if(p.length > 4 && p.endsWith('es')) return p.slice(0, -2);
+  if(p.length > 3 && p.endsWith('s'))  return p.slice(0, -1);
+  return p;
+}
+function palabrasDe(txt){
+  return sinTildes(txt).split(/\s+/).filter(Boolean).map(raiz);
+}
+function coincide(texto, palabras){
+  if(!palabras.length) return true;
+  const t = sinTildes(texto);
+  return palabras.every(p => t.includes(p));
+}
+
+/* Pone un valor en un campo AVISANDO como si lo hubieran escrito: las vistas
+   previas de la ficha se refrescan con los eventos input/change, así que sin
+   este aviso una foto elegida con 📂 no se veía hasta reabrir el producto. */
+function ponerValor(campo, valor){
+  if(!campo) return;
+  campo.value = valor;
+  campo.dispatchEvent(new Event('input', {bubbles: true}));
+  campo.dispatchEvent(new Event('change', {bubbles: true}));
+}
+
+/* El código se GUARDA sin el dígito de control (12) pero en el rótulo impreso
+   salen 13: en pantalla se muestra completo, igual que en la etiqueta. */
+function digitoControlEan(d12){
+  let s = 0;
+  for(let i = 0; i < 12; i++) s += (+d12[i]) * (i % 2 ? 3 : 1);
+  return String((10 - s % 10) % 10);
+}
+function cbCompleto(p){
+  const cb = String((p && p.codigo_barras) || '');
+  if(p && p.codigo_barras_ean) return p.codigo_barras_ean;   // ya viene del servidor
+  return (cb.length === 12 && /^\d{12}$/.test(cb)) ? cb + digitoControlEan(cb) : cb;
+}
+
+/* ---------------- PRODUCTOS ---------------- */
+let productos = [], proveedores = [], bodegasLista = [], selId = null, orden = {c:'nombre', asc:true}, filtro = '';
+/* carpeta de fotos configurada: se muestra como ayuda en la ficha para que
+   baste escribir el NOMBRE del archivo (la ruta la completa el servidor) */
+let cfgFotos = '';
+api('/api/config').then(c => { cfgFotos = (c && c.fotos_ruta) || ''; }).catch(() => {});
+/* filtros de la barra: proveedor, bodega, estado y rango de stock, rango de
+   precio, con etiqueta, con precio */
+let flt = {prov:'', bod:'', stock:'', pmin:null, pmax:null, cmin:null, cmax:null, tag:false, precio:false};
+
+async function cargarProductos(){
+  try{ productos = await api('/api/productos'); renderProductos(); }
+  catch(e){ toast('✖ ' + e.message); }
+  try{ proveedores = await api('/api/proveedores'); }catch(e){}
+  try{ bodegasLista = await api('/api/bodegas'); }catch(e){}
+  poblarFiltros();
+  renderProductos();
+}
+function poblarFiltros(){
+  const sp = document.getElementById('fl-prov'), sb = document.getElementById('fl-bod');
+  if(sp){
+    const v = sp.value;
+    sp.innerHTML = '<option value="">todos</option>' + proveedores.map(pr =>
+      `<option value="${pr.codigo}">${pr.codigo} — ${esc(pr.nombre)}</option>`).join('');
+    sp.value = v;
+  }
+  if(sb){
+    const v = sb.value;
+    sb.innerHTML = '<option value="">todas</option>' +
+      bodegasLista.map(b => `<option>${esc(b)}</option>`).join('');
+    sb.value = v;
+  }
+}
+function aplicarFiltros(){
+  const g = id => document.getElementById(id);
+  const num = id => { const v = g(id).value.trim(); return v === '' ? null : +v; };
+  flt = {prov:g('fl-prov').value, bod:g('fl-bod').value.toUpperCase(), stock:g('fl-stock').value,
+         pmin:num('fl-pmin'), pmax:num('fl-pmax'), cmin:num('fl-cmin'), cmax:num('fl-cmax'),
+         tag:g('fl-tag').checked, precio:g('fl-precio').checked};
+  const activo = flt.prov || flt.bod || flt.stock || flt.pmin !== null || flt.pmax !== null
+              || flt.cmin !== null || flt.cmax !== null || flt.tag || flt.precio;
+  g('fl-limpiar').style.display = activo ? '' : 'none';
+  g('barra-filtros').classList.toggle('activos', !!activo);
+  renderProductos(true);
+}
+function limpiarFiltros(){
+  ['fl-prov','fl-bod','fl-stock','fl-pmin','fl-pmax','fl-cmin','fl-cmax'].forEach(id => document.getElementById(id).value = '');
+  ['fl-tag','fl-precio'].forEach(id => document.getElementById(id).checked = false);
+  aplicarFiltros();
+}
+function pasaFiltros(p){
+  if(flt.prov && String(p.proveedor || 0) !== flt.prov) return false;
+  if(flt.bod && !String(p.ubicacion || '').toUpperCase().includes(flt.bod)) return false;
+  const st = p.cantidad_esperada || 0;
+  if(flt.stock === '0' && st !== 0) return false;
+  if(flt.stock === 'pos' && st <= 0) return false;
+  if(flt.stock === 'bajo' && !(st >= 1 && st <= 5)) return false;
+  if(flt.cmin !== null && st < flt.cmin) return false;
+  if(flt.cmax !== null && st > flt.cmax) return false;
+  const pr = p.precio || 0;
+  if(flt.pmin !== null && pr < flt.pmin) return false;
+  if(flt.pmax !== null && pr > flt.pmax) return false;
+  if(flt.tag && !(p.n_tags > 0)) return false;
+  if(flt.precio && !(pr > 0)) return false;
+  return true;
+}
+/* subirTabla=true cuando cambió la búsqueda, los filtros o el orden: la lista
+   es otra, así que se vuelve al principio */
+function renderProductos(subirTabla){
+  if(subirTabla){ const z = zonaTabla(); if(z) z.scrollTop = 0; }
+  const pal = palabrasDe(filtro);
+  // refsHits: ids que el servidor encontró buscando dentro de las
+  // REFERENCIAS APLICABLES (esas listas no viajan con la tabla)
+  let arr = productos.filter(p => {
+    if(pal.length && !(coincide(p.sku + ' ' + p.nombre + ' ' + (p.oem||'') + ' ' +
+                                (p.ubicacion||'') + ' ' + (p.codigo_barras||'') + ' ' +
+                                (p.codigo_barras_ean||''), pal)
+        || refsHits.has(p.id))) return false;
+    return pasaFiltros(p);
+  });
+  const {c, asc} = orden;
+  arr.sort((a, b) => {
+    let x = a[c] ?? '', y = b[c] ?? '';
+    if(typeof x === 'string'){ x = x.toLowerCase(); y = String(y).toLowerCase(); }
+    return (x < y ? -1 : x > y ? 1 : 0) * (asc ? 1 : -1);
+  });
+  tablaProd.mostrar(arr);
+  const txt = `${fmt(arr.length)} de ${fmt(productos.length)} productos`;
+  bcont(txt);
+  const cu = document.getElementById('fl-cuenta');
+  if(cu) cu.textContent = txt;
+}
+
+/* ---- tablas RÁPIDAS: solo se dibujan las filas que se ven ----
+   Con miles de filas, dibujarlas todas dejaba la ventana pesada (la rueda del
+   mouse iba a saltos). Ahora se dibuja solo lo visible y se deja arriba y
+   abajo un espacio del alto que ocuparían las demás, así la barra de
+   desplazamiento sigue midiendo lo mismo.
+   Lo usan la tabla de PRODUCTOS y la del CONTEO de inventario. */
+function TablaRapida(idTabla, columnas, filaHtml){
+  const t = {datos: [], alto: 0, ocupado: false, columnas, filaHtml};
+  t.tabla = () => document.getElementById(idTabla);
+  t.zona = () => { const x = t.tabla(); return x && x.closest('.twrap'); };
+  t.cuerpo = () => { const x = t.tabla(); return x && x.querySelector('tbody'); };
+
+  t.pintar = () => {
+    const zona = t.zona(), tb = t.cuerpo();
+    if(!zona || !tb) return;
+    const total = t.datos.length;
+    if(!total){ tb.innerHTML = ''; return; }
+    // la primera vez se mide cuánto ocupa una fila de verdad
+    if(!t.alto){
+      tb.innerHTML = t.filaHtml(t.datos[0]);
+      const tr = tb.querySelector('tr');
+      t.alto = (tr && tr.offsetHeight) || 27;
+    }
+    const caben = Math.ceil((zona.clientHeight || 600) / t.alto) + 20;   // + margen
+    let ini = Math.max(0, Math.floor(zona.scrollTop / t.alto) - 10);
+    ini = Math.min(ini, Math.max(0, total - caben));
+    const fin = Math.min(total, ini + caben);
+    const arriba = ini * t.alto, abajo = Math.max(0, (total - fin) * t.alto);
+    const relleno = alto => `<tr class="esp" style="height:${alto}px"><td colspan="${t.columnas}"></td></tr>`;
+    tb.innerHTML = (arriba ? relleno(arriba) : '')
+      + t.datos.slice(ini, fin).map(t.filaHtml).join('')
+      + (abajo ? relleno(abajo) : '');
+  };
+  t.mostrar = (datos, subir) => {
+    t.datos = datos;
+    const z = t.zona();
+    if(subir && z) z.scrollTop = 0;
+    t.pintar();
+  };
+  const alPintar = () => {
+    if(t.ocupado) return;
+    t.ocupado = true;
+    requestAnimationFrame(() => { t.ocupado = false; t.pintar(); });
+  };
+  const z = t.zona();
+  if(z) z.addEventListener('scroll', alPintar, {passive: true});
+  window.addEventListener('resize', alPintar);
+  return t;
+}
+
+const tablaProd = TablaRapida('t-productos', 8, p =>
+  `<tr data-id="${p.id}" class="${p.id === selId ? 'sel' : ''}">
+      <td>${esc(p.sku)}</td><td>${esc(p.nombre)}</td><td>${esc(p.oem)}</td>
+      <td>${esc(p.ubicacion)}</td>
+      <td class="num">${p.precio_minimo ? '$' + fmt(p.precio_minimo) : ''}</td>
+      <td class="num">${p.precio ? '$' + fmt(p.precio) : ''}</td>
+      <td class="num">${fmt(p.cantidad_esperada)}</td>
+      <td class="num">${fmt(p.n_tags)}</td></tr>`);
+
+const tablaSesion = TablaRapida('t-resumen', 6, r => {
+  const d = r.leidos - r.cantidad_esperada;
+  const cls = d === 0 ? 'ok' : (d < 0 ? 'falta' : 'sobra');
+  const txt = d === 0 ? '✔' : (d > 0 ? '+' + fmt(d) : '−' + fmt(-d));
+  return `<tr><td>${esc(r.sku)}</td><td>${esc(r.nombre)}</td><td>${esc(r.ubicacion)}</td>
+      <td class="num">${fmt(r.cantidad_esperada)}</td><td class="num">${fmt(r.leidos)}</td>
+      <td class="num ${cls}">${txt}</td></tr>`;
+});
+
+function zonaTabla(){ return tablaProd.zona(); }
+function pintarVentana(){ tablaProd.pintar(); }
+const tbodyP = document.querySelector('#t-productos tbody');
+tbodyP.addEventListener('click', e => {
+  const tr = e.target.closest('tr');
+  if(!tr || !tr.dataset.id) return;      // .esp = relleno, no es un producto
+  selId = +tr.dataset.id;
+  tbodyP.querySelectorAll('.sel').forEach(x => x.classList.remove('sel'));
+  tr.classList.add('sel');
+});
+function seleccionarFila(tr){
+  if(!tr.dataset.id) return;
+  selId = +tr.dataset.id;
+  tbodyP.querySelectorAll('.sel').forEach(x => x.classList.remove('sel'));
+  tr.classList.add('sel');
+}
+/* doble clic = ver la INFORMACIÓN del producto (solo lectura) */
+tbodyP.addEventListener('dblclick', e => {
+  const tr = e.target.closest('tr');
+  if(tr && tr.dataset.id){ seleccionarFila(tr); infoProducto(); }
+});
+/* clic DERECHO = modificar el producto (los vendedores solo ven la info) */
+tbodyP.addEventListener('contextmenu', e => {
+  const tr = e.target.closest('tr');
+  if(!tr || !tr.dataset.id) return;
+  e.preventDefault();
+  seleccionarFila(tr);
+  if(MODO === 'vendedor') infoProducto();
+  else modificarProducto();
+});
+document.querySelectorAll('#t-productos th').forEach(th => th.onclick = () => {
+  const c = th.dataset.c;
+  if(orden.c === c) orden.asc = !orden.asc; else orden = {c, asc:true};
+  document.querySelectorAll('#t-productos th').forEach(x => x.classList.remove('asc','desc'));
+  th.classList.add(orden.asc ? 'asc' : 'desc');
+  renderProductos(true);
+});
+let busT, refsHits = new Set();
+document.getElementById('buscar').addEventListener('input', e => {
+  clearTimeout(busT);
+  busT = setTimeout(async () => {
+    filtro = e.target.value;
+    refsHits = new Set();
+    renderProductos(true);
+    // además, buscar dentro de las referencias aplicables (en el servidor)
+    const q = filtro.trim();
+    if(q.length >= 2){
+      try{
+        const ids = await api('/api/productos/buscar_refs?q=' + encodeURIComponent(q));
+        if(filtro.trim() === q && ids.length){
+          refsHits = new Set(ids);
+          renderProductos(true);
+        }
+      }catch(e2){ /* sin esto la búsqueda normal sigue funcionando */ }
+    }
+  }, 180);
+});
+
+function selProd(){
+  const p = productos.find(x => x.id === selId);
+  if(!p) toast('Selecciona primero un producto en la lista');
+  return p || null;
+}
+function filaBodegaHtml(b){
+  // desplegable con las bodegas que existen: sin errores de escritura;
+  // "Nueva bodega…" cambia a texto libre solo si se quiere crear una a propósito
+  const val = String(b?.bodega || '').trim().toUpperCase();
+  const ops = (val && !bodegasLista.includes(val)) ? [val, ...bodegasLista] : bodegasLista;
+  return `<div style="display:flex;gap:6px;margin-top:4px">
+    <select class="b-nom" style="flex:2" onchange="bodegaNueva(this)">
+      ${val ? '' : '<option value="">— elige la bodega —</option>'}
+      ${ops.map(o => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('')}
+      <option value="__otra__">➕ Nueva bodega…</option>
+    </select>
+    <input class="b-cant" type="number" min="0" value="${b ? b.cantidad : 0}" style="flex:1"
+           oninput="totalBodegas()" title="Unidades en esta bodega">
+    <input class="b-pos" value="${esc(b?.posicion || '')}" style="flex:1;text-transform:uppercase"
+           placeholder="Pos. A1" maxlength="20"
+           title="Posición dentro de la bodega (estante/casilla): A1, F6, CJ4…">
+    <button class="btn" type="button" title="Quitar esta bodega"
+            onclick="this.parentNode.remove();totalBodegas()">🗑</button>
+  </div>`;
+}
+function bodegaNueva(sel){
+  if(sel.value !== '__otra__') return;
+  const inp = document.createElement('input');
+  inp.className = 'b-nom';
+  inp.placeholder = 'NOMBRE DE LA BODEGA NUEVA';
+  inp.style.cssText = 'flex:2;text-transform:uppercase';
+  sel.replaceWith(inp);
+  inp.focus();
+}
+function agregarFilaBodega(){
+  document.getElementById('f-bodegas').insertAdjacentHTML('beforeend', filaBodegaHtml(null));
+}
+function totalBodegas(){
+  let t = 0;
+  document.querySelectorAll('#f-bodegas .b-cant').forEach(x => t += (+x.value || 0));
+  const el = document.getElementById('f-total');
+  if(el) el.textContent = fmt(t);
+}
+function formProducto(p){
+  return `
+    <div class="fila2">
+      <label>Código (SKU) *<input id="f-sku" value="${esc(p?.sku || '')}"></label>
+      <label>Ref. fábrica (OEM)<input id="f-oem" value="${esc(p?.oem || '')}"></label>
+    </div>
+    <label>Referencias aplicables
+      <div style="display:flex;gap:6px;align-items:stretch">
+        <textarea id="f-refs" rows="2" data-cargado="${p ? '0' : '1'}"
+                  style="max-height:96px;min-height:38px"
+                  placeholder="${p ? 'cargando…' : 'otras referencias que le aplican a este producto'}"></textarea>
+        <button class="btn" type="button" onclick="expandirReferencias()"
+                title="Ver / editar la lista completa en grande"
+                style="align-self:stretch;font-size:16px">⤢</button>
+      </div>
+    </label>
+    <label>Nombre del producto *<input id="f-nombre" value="${esc(p?.nombre || '')}"></label>
+    ${p ? `<div class="hint" style="margin-top:2px">Stock actual:
+      <b>${fmt(p.cantidad_esperada)}</b>${p.ubicacion ? ' en ' + esc(p.ubicacion) : ''}
+      — se ajusta con el botón <b>🔢 Fijar stock</b> (unidades por bodega)</div>
+      <div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:8px">🚦 Rotación</div>
+      <div id="f-rot">${semaforoChico(p)}</div>
+      <div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:6px">📍 Posición por bodega
+        <span class="hint" style="font-weight:400">(dónde está guardado: A1, F6…)</span></div>
+      <div id="f-posiciones" class="hint" style="margin-top:2px">cargando…</div>`
+    : `<div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:4px">Stock inicial por bodega
+        <span class="hint" style="font-weight:400">(opcional; luego se ajusta con 🔢 Fijar stock)</span></div>
+       <div id="f-bodegas">${filaBodegaHtml(null)}</div>
+       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
+         <button class="btn mini" type="button" onclick="agregarFilaBodega()">➕ Otra bodega</button>
+         <span class="hint" style="margin:0">Stock total: <b id="f-total">0</b></span>
+       </div>`}
+    <div class="fila2">
+      <label>Precio mínimo ($)<input id="f-pmin" type="number" min="0" step="500" value="${p?.precio_minimo || ''}"></label>
+      <label>Precio normal ($)<input id="f-pnor" type="number" min="0" step="500" value="${p?.precio || ''}"></label>
+    </div>
+    <label>Proveedor
+      <div style="position:relative">
+        <input id="f-prov-txt" autocomplete="off"
+               placeholder="escribe el número o el nombre para buscarlo…">
+        <input type="hidden" id="f-prov" value="${p?.proveedor || 0}">
+        <div id="f-prov-lista" class="combo-lista" style="display:none"></div>
+      </div>
+    </label>
+    <label>Código de barras EAN
+      <input id="f-cb" class="mono" value="${esc(p ? cbCompleto(p) : '')}" placeholder="se genera solo con proveedor y precios">
+    </label>
+    <label>Foto de la etiqueta (solo si no sale sola)
+      <div style="display:flex;gap:6px">
+        <input id="f-foto" value="${esc(p?.foto || '')}" style="flex:1"
+               placeholder="se busca sola por referencia en la carpeta de fotos">
+        <button class="btn" type="button" onclick="elegirArchivoFoto('f-foto')" title="Buscar el archivo">📂</button>
+      </div>
+      <span class="hint">Basta el <b>nombre del archivo</b> (ej. 032905106B.jpg): la carpeta
+      se completa sola con la configurada${cfgFotos ? ' — ' + esc(cfgFotos) : ' en ⚙ Configuración'}.</span>
+    </label>
+    <div id="f-previews">
+      <div style="font-size:12px;color:#5A5856;font-weight:600">👁 Así saldrán sus etiquetas
+        <span class="hint" style="font-weight:400">(se actualizan mientras escribes)</span></div>
+      <div class="fila2" style="align-items:start;margin-top:4px">
+        <div>
+          <div class="hint" style="margin:0 0 3px;text-align:center">🏷️ Código de barras (Zebra)</div>
+          <img id="f-prev-cb" alt="" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;background:#fff;display:none">
+          <div class="hint" id="f-prev-cb-msg" style="text-align:center">generando…</div>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 3px;text-align:center">📝 Descripción (SAT)</div>
+          <img id="f-prev-desc" alt="" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;background:#fff;display:none">
+          <div class="hint" id="f-prev-desc-msg" style="text-align:center">generando…</div>
+        </div>
+      </div>
+    </div>
+    <div class="hint">El código <b>empieza con el nº del proveedor</b> y lleva
+    los precios adentro: <b>mínimo ÷ 1.000</b> termina justo en las guías del
+    centro y el <b>normal ÷ 100</b> empieza enseguida de ellas:
+    30 0026 ‖ 270... = proveedor 30 · mín $26.000 · normal $27.000.
+    Déjalo vacío y se regenera solo al guardar.</div>`;
+}
+function proveedorCambiado(sel){
+  // al cambiar el proveedor el código de barras se regenera al guardar
+  const cb = sel.closest('.overlay,body').querySelector('#f-cb');
+  if(cb && cb.value){
+    cb.value = '';
+    cb.placeholder = 'se regenerará con el nuevo proveedor al guardar';
+  }
+}
+/* --- buscador de proveedor: se escribe para filtrar, y se pueden AGREGAR --- */
+function nombreProv(cod){
+  cod = +cod || 0;
+  if(!cod) return '— sin proveedor —';
+  const pr = proveedores.find(x => x.codigo === cod);
+  return pr ? `${pr.codigo} — ${pr.nombre}` : String(cod);
+}
+function iniciarComboProv(ov){
+  const txt = ov.querySelector('#f-prov-txt'), hid = ov.querySelector('#f-prov'),
+        lista = ov.querySelector('#f-prov-lista');
+  if(!txt || !hid || !lista) return;
+  const sin = t => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const pinta = () => {
+    const q = sin(txt.value.trim());
+    const items = [{codigo:0, nombre:'— sin proveedor —'}].concat(proveedores)
+      .filter(pr => !q || String(pr.codigo).startsWith(q) || sin(pr.nombre).includes(q));
+    lista.innerHTML = items.map(pr =>
+      `<div data-c="${pr.codigo}">${pr.codigo ? pr.codigo + ' — ' : ''}${esc(pr.nombre)}</div>`).join('')
+      + `<div data-c="__nuevo__" style="color:#C25705;font-weight:600;border-top:1px solid #E7E5E3">➕ Agregar proveedor nuevo…</div>`;
+    lista.style.display = '';
+  };
+  const elegir = c => {
+    lista.style.display = 'none';
+    if(c === '__nuevo__'){ nuevoProveedor(ov); return; }
+    hid.value = c;
+    txt.value = nombreProv(c);
+    proveedorCambiado(hid);
+    hid.dispatchEvent(new Event('change', {bubbles:true}));  // refresca las etiquetas
+  };
+  lista.addEventListener('pointerdown', e => {
+    const it = e.target.closest('[data-c]'); if(!it) return;
+    e.preventDefault();       // que el campo no pierda el foco antes de elegir
+    elegir(it.dataset.c === '__nuevo__' ? '__nuevo__' : +it.dataset.c);
+  });
+  txt.addEventListener('focus', () => { txt.select(); pinta(); });
+  txt.addEventListener('input', pinta);
+  txt.addEventListener('blur', () => setTimeout(() => {
+    lista.style.display = 'none';
+    txt.value = nombreProv(hid.value);   // lo escrito sin elegir no cambia nada
+  }, 160));
+  txt.value = nombreProv(hid.value);
+}
+function nuevoProveedor(ovFicha){
+  const sig = proveedores.reduce((m, pr) => Math.max(m, pr.codigo), 0) + 1;
+  modal('➕ Nuevo proveedor', `
+    <div class="fila2">
+      <label>Código (número) *<input id="np-cod" type="number" min="1" max="9999" value="${sig}"></label>
+      <label>Nombre *<input id="np-nom" style="text-transform:uppercase" placeholder="NOMBRE DEL PROVEEDOR"></label>
+    </div>
+    <div class="hint">El código es el número con el que <b>empiezan los códigos de barras</b>
+    de sus productos (ej. 30 = INNOVATEQ en 30 0026…). Te sugiero el siguiente libre,
+    pero puedes poner otro que no esté usado.</div>`,
+    [{t:'Cancelar'}, {t:'Guardar', p:1, f:async o => {
+      try{
+        const j = await api('/api/proveedores', {codigo:+o.querySelector('#np-cod').value,
+                                                 nombre:o.querySelector('#np-nom').value.trim()});
+        proveedores.push({codigo:j.codigo, nombre:j.nombre});
+        proveedores.sort((a, b) => a.codigo - b.codigo);
+        o.remove();
+        toast(`✔ Proveedor agregado: ${j.codigo} — ${j.nombre}`);
+        // si había una ficha abierta, queda elegido de una vez
+        const hid = ovFicha && ovFicha.querySelector('#f-prov');
+        const txt = ovFicha && ovFicha.querySelector('#f-prov-txt');
+        if(hid){
+          hid.value = j.codigo;
+          proveedorCambiado(hid);
+          hid.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+        if(txt) txt.value = `${j.codigo} — ${j.nombre}`;
+      }catch(e){ toast('✖ ' + e.message); }
+    }}]);
+}
+async function guardarProducto(ov, id){
+  const v = x => ov.querySelector(x).value;
+  const datos = {id, sku:v('#f-sku'), nombre:v('#f-nombre'),
+    oem:v('#f-oem'),
+    precio_minimo:v('#f-pmin'), precio:v('#f-pnor'), codigo_barras:v('#f-cb'),
+    proveedor:v('#f-prov'), foto:v('#f-foto')};
+  // las referencias solo se mandan si ya estaban cargadas (si no, el servidor
+  // conserva las que había — nunca se borran por accidente)
+  const refs = ov.querySelector('#f-refs');
+  if(refs && refs.dataset.cargado === '1') datos.referencias = refs.value;
+  // solo el formulario de NUEVO producto trae el editor de bodegas: ahí se
+  // manda el stock inicial (en Modificar no existe → el stock no se toca)
+  if(ov.querySelector('#f-bodegas')) datos.bodegas = leerFilasBodega(ov);
+  // en Modificar solo se editan las POSICIONES (las cantidades no se tocan)
+  const camposPos = [...ov.querySelectorAll('.p-pos')];
+  try{
+    const j = await api('/api/productos/guardar', datos);
+    if(id && camposPos.length){
+      const posiciones = camposPos.map(x => ({bodega: x.dataset.bodega,
+                                              posicion: x.value.trim().toUpperCase()}));
+      try{ await api(`/api/productos/${id}/posiciones`, {posiciones}); }catch(e2){}
+    }
+    ov.remove();
+    toast('✔ Producto guardado' + (j.codigo_barras ? ' · código ' + j.codigo_barras : ''));
+    await cargarProductos();
+  }catch(e){ toast('✖ ' + e.message); }
+}
+function nuevoProducto(){
+  const ov = modal('Nuevo producto', formProducto(null),
+    [{t:'Cancelar'}, {t:'Guardar', p:1, f:o => guardarProducto(o, null)}]);
+  iniciarComboProv(ov);
+  iniciarPreviewsFicha(ov, null);
+}
+/* --- previsualización EN VIVO de las dos etiquetas en la ficha --- */
+function iniciarPreviewsFicha(ov, p){
+  if(!ov.querySelector('#f-previews')) return;
+  let timer = 0, token = 0;
+  const refrescar = () => {
+    const v = x => { const el = ov.querySelector(x); return el ? el.value : ''; };
+    const prod = {id: p ? p.id : 0, sku: v('#f-sku'), nombre: v('#f-nombre'),
+                  oem: v('#f-oem'), precio_minimo: v('#f-pmin'), precio: v('#f-pnor'),
+                  proveedor: v('#f-prov'), codigo_barras: v('#f-cb'), foto: v('#f-foto'),
+                  ubicacion: p ? (p.ubicacion || '') : ''};
+    const t = ++token;
+    for(const [url, id, sinInternet] of [['/api/etiqueta/preview', '#f-prev-cb', 1],
+                                         ['/api/etiqueta/preview_desc', '#f-prev-desc', 0]]){
+      const pinta = blob => {
+        if(t !== token) return;                    // ya hay una petición más nueva
+        const img = ov.querySelector(id), msg = ov.querySelector(id + '-msg');
+        if(!img || !img.isConnected) return;       // cerraron la ficha
+        if(blob){
+          if(img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+          img.src = img.dataset.url = URL.createObjectURL(blob);
+          img.style.display = '';
+          if(msg) msg.style.display = 'none';
+        }else{
+          img.style.display = 'none';
+          if(msg){
+            msg.style.display = '';
+            msg.textContent = sinInternet ? '✖ esta vista necesita internet' : '✖ no se pudo generar';
+          }
+        }
+      };
+      fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                  body: JSON.stringify({producto: prod})})
+        .then(r => r.ok ? r.blob() : null).then(pinta).catch(() => pinta(null));
+    }
+  };
+  const programa = () => { clearTimeout(timer); timer = setTimeout(refrescar, 600); };
+  ov.querySelectorAll('#f-sku,#f-oem,#f-nombre,#f-pmin,#f-pnor,#f-prov,#f-cb,#f-foto')
+    .forEach(el => { el.addEventListener('input', programa); el.addEventListener('change', programa); });
+  refrescar();
+}
+
+/* --- referencias aplicables: pueden ser MILES de caracteres --- */
+async function cargarReferencias(id){
+  const t = document.getElementById('f-refs');
+  if(!t) return;
+  try{
+    const j = await api(`/api/productos/${id}/referencias`);
+    if(!t.isConnected) return;         // cerraron la ficha mientras cargaba
+    t.value = j.referencias || '';
+    t.dataset.cargado = '1';
+    t.placeholder = 'otras referencias que le aplican a este producto';
+  }catch(e){
+    t.placeholder = '✖ no se pudieron cargar — al guardar no se tocan';
+  }
+}
+function expandirReferencias(){
+  const chico = document.getElementById('f-refs');
+  if(!chico) return;
+  if(chico.dataset.cargado !== '1'){ toast('⏳ Un momento: cargando las referencias…'); return; }
+  const ov = modal('Referencias aplicables',
+    `<textarea id="f-refs-g" style="height:56vh;min-height:240px;font:13px/1.5 Consolas,monospace"></textarea>
+     <div class="hint" style="margin-top:4px"><b id="f-refs-n">0</b> caracteres —
+     pega o edita aquí la lista completa; <b>✔ Aplicar</b> la pasa a la ficha
+     (y luego Guardar el producto).</div>`,
+    [{t:'Cancelar'}, {t:'✔ Aplicar', p:1, f:o => {
+      chico.value = o.querySelector('#f-refs-g').value;
+      o.remove();
+    }}]);
+  const g = ov.querySelector('#f-refs-g');
+  g.value = chico.value;
+  const n = ov.querySelector('#f-refs-n');
+  const cuenta = () => { n.textContent = fmt(g.value.length); };
+  g.oninput = cuenta; cuenta();
+  g.focus();
+}
+
+/* --- autodetectar la impresora en la red --- */
+async function buscarImpresora(){
+  const bot = document.getElementById('c-buscar');
+  const inp = document.getElementById('c-ip');
+  if(bot){ bot.disabled = true; bot.textContent = '⏳'; }
+  try{
+    const j = await api('/api/impresora/buscar', {});
+    if(j.zebras.length === 1){
+      if(inp) inp.value = j.zebras[0].ip;
+      toast(`✔ Impresora encontrada: ${j.zebras[0].modelo} en ${j.zebras[0].ip} — Guarda para aplicar`);
+    }else if(j.zebras.length > 1){
+      toast('Se encontraron varias Zebra: ' +
+            j.zebras.map(z => `${z.modelo} (${z.ip})`).join(' · '));
+    }else if(j.impresoras.length){
+      toast('Equipos con puerto de impresión: ' +
+            j.impresoras.map(z => z.ip).join(', ') + ' — ninguno contestó como Zebra');
+    }else{
+      toast('✖ No se encontró ninguna impresora en la red. ¿Está prendida y con el cable de red?');
+    }
+  }catch(e){ toast('✖ ' + e.message); }
+  if(bot){ bot.disabled = false; bot.textContent = '🔍'; }
+}
+async function buscarImpresoraSat(){
+  /* la SAT no dice su nombre por red (eso solo lo hacen las Zebra), así que se
+     listan los equipos con puerto de impresión y el usuario elige el suyo */
+  const bot = document.getElementById('c-sat-buscar');
+  const inp = document.getElementById('c-sat-ip');
+  if(bot){ bot.disabled = true; bot.textContent = '⏳'; }
+  try{
+    const j = await api('/api/impresora/buscar', {});
+    const deZebra = new Set((j.zebras || []).map(z => z.ip));
+    const cand = (j.impresoras || []).filter(x => !deZebra.has(x.ip));
+    if(!cand.length){
+      toast('✖ No se encontró ningún otro equipo con puerto de impresión. ¿La SAT está prendida y con red?');
+    }else if(cand.length === 1){
+      if(inp) inp.value = cand[0].ip;
+      toast(`✔ Un candidato: ${cand[0].ip} — Guarda y haz una prueba en 🎨 Diseño → 📝 Descripción`);
+    }else{
+      modal('¿Cuál es la impresora SAT?',
+        `<div class="hint" style="margin-bottom:6px">Estos equipos tienen puerto de impresión
+         (la Zebra ya está descartada). Elige uno y luego imprime una prueba en
+         🎨 Diseño → pestaña 📝 Descripción; si no sale, prueba con otro.</div>` +
+        cand.map(x => `<button class="btn" style="display:block;width:100%;margin-top:6px"
+          onclick="const i=document.getElementById('c-sat-ip');if(i)i.value='${x.ip}';this.closest('.overlay').remove()">
+          ${x.ip}${x.modelo ? ' — ' + esc(x.modelo) : ''}</button>`).join(''),
+        [{t:'Cerrar', p:1}]);
+    }
+  }catch(e){ toast('✖ ' + e.message); }
+  if(bot){ bot.disabled = false; bot.textContent = '🔍'; }
+}
+
+function productoDiseno(){
+  const sku = ((document.getElementById('dis-sku') || {}).value || '').trim().toLowerCase();
+  return productos.find(x => String(x.sku || '').toLowerCase() === sku) || null;
+}
+async function guardarFotoProducto(ruta){
+  const p = productoDiseno();
+  if(!p){ toast('Primero pon arriba una referencia que exista'); return; }
+  try{
+    await api(`/api/productos/${p.id}/foto`, {ruta});
+    p.foto = ruta;
+    toast(ruta ? '✔ Foto asignada a ' + p.sku : '✔ Foto quitada: se buscará sola');
+    dibujarEtiqueta();
+  }catch(e){ toast('✖ ' + e.message); }
+}
+function elegirFotoDiseno(){
+  // mismo explorador (sirve desde cualquier PC) y al elegir, se asigna
+  elegirArchivoFoto('dis-foto-ruta', ruta => { if(ruta) guardarFotoProducto(ruta); });
+}
+
+/* --- importar Excel / CSV --- */
+const IMP_CAMPOS = {
+  productos: [['sku','Referencia (SKU) *'],['nombre','Nombre'],['oem','Ref. fábrica (OEM)'],
+              ['referencias','Referencias aplicables'],
+              ['ubicacion','Bodega'],['cantidad','Stock'],['precio_minimo','Precio mínimo'],
+              ['precio','Precio normal'],['proveedor','Proveedor'],['codigo_barras','Código de barras'],
+              ['foto','Foto (ruta o archivo)'],['posicion','Posición (A1, F6…)']],
+  precios:   [['sku','Referencia (SKU) *'],['precio_minimo','Precio mínimo'],
+              ['precio','Precio normal'],['proveedor','Proveedor']],
+  inventario:[['sku','Referencia (SKU) *'],['cantidad','Cantidad contada *']],
+  fotos:     [['sku','Referencia (SKU) *'],['foto','Foto (ruta o archivo) *']],
+  posiciones:[['sku','Referencia (SKU) *'],['posicion','Posición (A1, F6…) *']],
+  referencias:[['sku','Referencia (SKU) *'],['referencias','Referencias aplicables *']]
+};
+let impInfo = null, impTipo = 'productos';
+function importarExcel(){
+  impInfo = null; impTipo = 'productos';
+  modal('Importar Excel o CSV', `
+    <div class="hint">Sirve para crear o actualizar <b>productos</b>, cargar <b>precios</b>
+    o pasar un <b>conteo de inventario</b>. El archivo debe tener una fila de títulos
+    (Código, Nombre, Precio…). Formatos: <b>.xlsx</b> o <b>.csv</b>
+    — si tienes un .xls viejo, ábrelo en Excel y guárdalo como .xlsx.</div>
+    <label style="margin-top:10px">Archivo
+      <input type="file" id="imp-file" accept=".xlsx,.xlsm,.csv,.txt" onchange="impAnalizar()">
+    </label>
+    <div id="imp-zona"></div>`,
+    [{t:'Cerrar'}]);
+}
+async function impAnalizar(hoja){
+  const inp = document.getElementById('imp-file');
+  if(!(inp && inp.files[0])) return;
+  const zona = document.getElementById('imp-zona');
+  zona.innerHTML = '<div class="hint" style="margin-top:8px">⏳ Leyendo el archivo…</div>';
+  const fd = new FormData();
+  fd.append('archivo', inp.files[0]);
+  if(hoja) fd.append('hoja', hoja);
+  try{
+    const r = await fetch('/api/importar/analizar', {method:'POST', body:fd});
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok || !j.ok) throw new Error(j.error || 'No se pudo leer el archivo');
+    impInfo = j;
+    impRender();
+  }catch(e){ zona.innerHTML = `<div class="hint" style="margin-top:8px;color:#B3261E">✖ ${esc(e.message)}</div>`; }
+}
+function impRender(){
+  const j = impInfo, zona = document.getElementById('imp-zona');
+  if(!j || !zona) return;
+  const sel = campo => `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;font-size:12px">
+      <span style="width:150px;flex:none;color:#5A5856">${campo[1]}</span>
+      <select id="imp-map-${campo[0]}" style="flex:1;padding:3px;border:1px solid #C8C6C4;border-radius:3px">
+        <option value="">— no usar —</option>
+        ${j.columnas.map(c => `<option value="${c.i}" ${j.mapeo[campo[0]] === c.i ? 'selected' : ''}>${esc(c.titulo)}</option>`).join('')}
+      </select></div>`;
+  zona.innerHTML = `
+    ${j.hojas.length > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px">
+      <span style="width:150px;flex:none;color:#5A5856">Hoja del Excel</span>
+      <select style="flex:1;padding:3px;border:1px solid #C8C6C4;border-radius:3px"
+              onchange="impAnalizar(this.value)">
+        ${j.hojas.map(h => `<option ${h === j.hoja ? 'selected' : ''}>${esc(h)}</option>`).join('')}
+      </select></div>` : ''}
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">¿Qué quieres importar?</div>
+    ${[['productos','Productos (crea nuevos y actualiza existentes)'],
+       ['precios','Solo precios (y regenera el código de barras)'],
+       ['inventario','Conteo de inventario (reemplaza el stock)'],
+       ['fotos','Solo fotos (asigna la imagen de cada producto)'],
+       ['posiciones','Solo posiciones (dónde está guardado: A1, F6…)'],
+       ['referencias','Solo referencias aplicables (equivalencias)']].map(([v, n]) => `
+      <label class="chk" style="margin-top:3px;font-size:12px">
+        <input type="radio" name="imp-tipo" value="${v}" ${impTipo === v ? 'checked' : ''}
+               onchange="impTipo=this.value;impRender()"> ${n}</label>`).join('')}
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+      Columnas del archivo (revisa que estén bien)</div>
+    ${IMP_CAMPOS[impTipo].map(sel).join('')}
+    ${impTipo !== 'precios' && (j.bodegas_sugeridas || []).length ? `
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+      Unidades por bodega <span style="font-weight:400;color:#8A8886">(cada columna marcada es una bodega)</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:2px 16px">
+      ${j.bodegas_sugeridas.map(i => `
+      <label class="chk" style="margin-top:3px;font-size:12px">
+        <input type="checkbox" class="imp-bod" value="${i}" checked> ${esc(j.columnas[i].titulo)}</label>`).join('')}
+    </div>
+    <div class="hint">Con esto el stock de cada bodega queda guardado por separado;
+    el total y la ubicación se calculan solos.</div>` : ''}
+    ${(impTipo === 'posiciones' || impTipo === 'productos') ? `
+    <div id="imp-zona-pos" style="display:${j.mapeo.posicion !== undefined || impTipo === 'posiciones' ? '' : 'none'}">
+      <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+        ¿A qué bodega pertenecen esas posiciones?</div>
+      <select id="imp-bod-pos" style="width:100%;padding:4px;border:1px solid #C8C6C4;border-radius:3px;font-size:12px">
+        ${(bodegasLista.length ? bodegasLista : ['ALMACEN']).map(b =>
+          `<option ${b === 'ALMACEN' ? 'selected' : ''}>${esc(b)}</option>`).join('')}
+      </select>
+      <div class="hint">La posición (A1, F6…) dice dónde está guardado el repuesto
+      DENTRO de esa bodega. No cambia las cantidades.</div>
+    </div>` : ''}
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+      Vista previa (${fmt(j.total)} filas de datos)</div>
+    <div style="overflow:auto;max-height:130px;border:1px solid #E7E5E3;border-radius:4px;margin-top:4px">
+      <table style="font-size:11px;white-space:nowrap">
+        <tr>${j.columnas.map(c => `<th style="padding:3px 8px;background:#F3F1EF;text-align:left">${esc(c.titulo)}</th>`).join('')}</tr>
+        ${j.muestra.map(f => `<tr>${f.map(c => `<td style="padding:2px 8px;border-top:1px solid #F3F1EF">${esc(c)}</td>`).join('')}</tr>`).join('')}
+      </table></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button class="btn prim" id="imp-boton" onclick="impEjecutar()">⬆ Importar ${fmt(j.total)} filas</button>
+    </div>
+    <div id="imp-resultado"></div>`;
+}
+async function impEjecutar(){
+  const mapeo = {};
+  document.querySelectorAll('[id^="imp-map-"]').forEach(s => {
+    if(s.value !== '') mapeo[s.id.slice(8)] = +s.value;
+  });
+  const bodegas = [...document.querySelectorAll('.imp-bod:checked')].map(x => +x.value);
+  const selBP = document.getElementById('imp-bod-pos');
+  const bodega_posicion = (selBP && mapeo.posicion !== undefined) ? selBP.value : '';
+  const bot = document.getElementById('imp-boton');
+  const res = document.getElementById('imp-resultado');
+  bot.disabled = true; bot.textContent = '⏳ Importando…';
+  try{
+    const j = await api('/api/importar/ejecutar',
+                        {token: impInfo.token, tipo: impTipo, mapeo, bodegas, bodega_posicion});
+    let h = `<div style="margin-top:10px;padding:10px;background:#F0F8F1;border:1px solid #B7DFB9;border-radius:4px;font-size:12.5px">
+      ✔ <b>Importación terminada.</b><br>
+      ${j.creados ? `Productos creados: <b>${fmt(j.creados)}</b><br>` : ''}
+      ${j.actualizados ? `Actualizados: <b>${fmt(j.actualizados)}</b><br>` : ''}
+      ${j.sin_cambios ? `Sin cambios (ya estaban igual): ${fmt(j.sin_cambios)}<br>` : ''}
+      ${j.no_encontrados ? `<span style="color:#B3261E">Referencias que NO existen en el catálogo: <b>${fmt(j.no_encontrados)}</b>
+        (${j.no_encontrados_lista.map(esc).join(', ')}${j.no_encontrados > 15 ? '…' : ''})</span><br>` : ''}
+      ${j.errores.length ? `<span style="color:#B3261E">Errores:<br>${j.errores.map(esc).join('<br>')}</span>` : ''}
+    </div>`;
+    res.innerHTML = h;
+    bot.textContent = '✔ Listo';
+    await cargarProductos();
+  }catch(e){
+    res.innerHTML = `<div class="hint" style="margin-top:8px;color:#B3261E">✖ ${esc(e.message)}</div>`;
+    bot.disabled = false; bot.textContent = '⬆ Reintentar';
+  }
+}
+function modificarProducto(){
+  const p = selProd(); if(!p) return;
+  const ov = modal('Modificar producto', formProducto(p),
+    [{t:'Cancelar'}, {t:'Guardar', p:1, f:o => guardarProducto(o, p.id)}]);
+  iniciarComboProv(ov);
+  cargarReferencias(p.id);   // llegan aparte: pueden ser miles de caracteres
+  cargarPosiciones(ov, p);   // solo la POSICIÓN (el stock va en 🔢 Fijar stock)
+  iniciarPreviewsFicha(ov, p);
+}
+/* En Modificar NO se editan las cantidades (eso es 🔢 Fijar stock), pero sí
+   la POSICIÓN de cada bodega: dónde está guardado el repuesto. */
+async function cargarPosiciones(ov, p){
+  const zona = ov.querySelector('#f-posiciones');
+  if(!zona) return;
+  let bs = [];
+  try{ bs = await api(`/api/productos/${p.id}/bodegas`); }
+  catch(e){ zona.textContent = 'no se pudo cargar'; return; }
+  if(!bs.length){
+    zona.innerHTML = `<span style="color:#8A8886">Este producto todavía no tiene
+      bodegas asignadas — use <b>🔢 Fijar stock</b> para repartirlo y ahí podrá
+      ponerle la posición.</span>`;
+    return;
+  }
+  zona.innerHTML = bs.map(b => `
+    <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+      <span style="flex:2;color:#252423">${esc(b.bodega)}
+        <span style="color:#8A8886">(${fmt(b.cantidad)} u.)</span></span>
+      <input class="p-pos" data-bodega="${esc(b.bodega)}" value="${esc(b.posicion || '')}"
+             placeholder="A1" maxlength="20"
+             style="flex:1;text-transform:uppercase;padding:3px 6px;border:1px solid #C8C6C4;border-radius:3px">
+    </div>`).join('');
+}
+/* Lo ÚNICO que un vendedor puede cambiar: las referencias aplicables.
+   No toca precios, stock, fotos ni nada más. */
+async function guardarRefsVendedor(ov, p, btn){
+  const ed = ov.querySelector('#i-refs-edit');
+  if(!ed) return ov.remove();
+  if(ed.dataset.cargado !== '1')
+    return toast('Espera a que terminen de cargar las referencias');
+  btn.disabled = true; btn.textContent = '⏳ Guardando…';
+  try{
+    await api(`/api/productos/${p.id}/referencias`, {referencias: ed.value});
+    ov.remove();
+    toast('✔ Referencias guardadas de ' + p.sku);
+  }catch(e){
+    btn.disabled = false; btn.textContent = '💾 Guardar referencias';
+    toast('✖ ' + e.message);
+  }
+}
+
+/* ---------- SEMÁFORO DE ROTACIÓN ----------
+   Verde = se vende mucho · Ámbar = demanda moderada · Rojo = casi no se vende.
+   Se calcula con las unidades VENDIDAS en los últimos meses (los ajustes y
+   las importaciones no cuentan). Los límites se cambian en ⚙ Configuración. */
+const ROTACION = {
+  alta:  {t:'ALTA ROTACIÓN',  color:'#1F7A44', fondo:'#EAF6EE', icono:'📈',
+          d:'Mucha demanda. Mantener buen stock y en sitio de fácil acceso.'},
+  media: {t:'MEDIA ROTACIÓN', color:'#C9930A', fondo:'#FDF6E3', icono:'📊',
+          d:'Demanda moderada. Revisar el nivel de existencias de vez en cuando.'},
+  baja:  {t:'BAJA ROTACIÓN',  color:'#B3261E', fondo:'#FDECEA', icono:'📉',
+          d:'Poca salida. Revisar precio, promoción o moverlo de bodega.'},
+};
+function rotDe(p){ return ROTACION[p && p.rotacion] || ROTACION.baja; }
+
+/* Semáforo GRANDE (ventana de información, al lado de las fotos) */
+function semaforoGrande(p){
+  const r = rotDe(p), niveles = ['alta', 'media', 'baja'];
+  const luces = niveles.map(n => {
+    const enc = n === (p.rotacion || 'baja');
+    return `<div style="width:26px;height:26px;border-radius:50%;margin:4px auto;
+      background:${enc ? ROTACION[n].color : '#DDDBD9'};
+      box-shadow:${enc ? '0 0 9px ' + ROTACION[n].color : 'none'}"></div>`;
+  }).join('');
+  return `<div style="display:flex;gap:10px;align-items:center;border:2px solid ${r.color};
+       background:${r.fondo};border-radius:10px;padding:8px 10px">
+    <div style="background:#2B2B2B;border-radius:9px;padding:5px 4px;flex:none">${luces}</div>
+    <div style="min-width:0">
+      <div style="font-size:15px;font-weight:800;color:${r.color};line-height:1.15">
+        ${r.icono} ${r.t}</div>
+      <div style="font-size:11.5px;color:#4C4A48;margin-top:3px">${r.d}</div>
+      <div style="font-size:11px;color:#8A8886;margin-top:3px">
+        ${p.rotacion_manual
+          ? '✋ puesta a mano (no cambia sola)'
+          : fmt(p.vendidos || 0) + ' unidad(es) vendida(s) en el periodo'}</div>
+    </div>
+  </div>`;
+}
+
+/* Semáforo compacto + botones para ponerlo A MANO (ficha de Modificar) */
+function semaforoChico(p){
+  const r = rotDe(p), niveles = ['alta', 'media', 'baja'];
+  const manual = !!p.rotacion_manual;
+  const luces = niveles.map(n => {
+    const enc = n === (p.rotacion || 'baja');
+    return `<span style="display:inline-block;width:13px;height:13px;border-radius:50%;
+      margin:0 2px;background:${enc ? ROTACION[n].color : '#DDDBD9'};
+      box-shadow:${enc ? '0 0 6px ' + ROTACION[n].color : 'none'}"></span>`;
+  }).join('');
+  const botones = niveles.map(n => `
+    <button class="btn mini" type="button" onclick="cambiarRotacion(${p.id}, '${n}')"
+            title="Poner a mano en ${ROTACION[n].t}"
+            style="border-color:${ROTACION[n].color};color:${ROTACION[n].color};
+                   ${p.rotacion === n ? 'font-weight:800;background:' + ROTACION[n].fondo : ''}">
+      ${ROTACION[n].icono} ${n.toUpperCase()}</button>`).join('');
+  return `<div style="border:2px solid ${r.color};background:${r.fondo};
+       border-radius:8px;padding:6px 9px;margin-top:4px">
+    <div style="display:flex;gap:9px;align-items:center">
+      <span style="background:#2B2B2B;border-radius:11px;padding:3px 5px;flex:none;
+         white-space:nowrap">${luces}</span>
+      <span style="font-size:13px;font-weight:800;color:${r.color}">${r.icono} ${r.t}</span>
+      <span class="hint" style="margin:0 0 0 auto;text-align:right">
+        ${manual ? '✋ puesta a mano' : fmt(p.vendidos || 0) + ' vendidas<br>en el periodo'}</span>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center;margin-top:6px;flex-wrap:wrap">
+      <span class="hint" style="margin:0">Cambiar a mano:</span>
+      ${botones}
+      ${manual ? `<button class="btn mini" type="button" onclick="cambiarRotacion(${p.id}, '')"
+            title="Que vuelva a calcularse sola con las ventas">↺ Automática</button>` : ''}
+    </div>
+  </div>`;
+}
+
+/* Cambiar la rotación A MANO — siempre avisando qué implica */
+function cambiarRotacion(pid, nivel){
+  const p = productos.find(x => x.id === pid);
+  if(!p) return;
+  const aplicar = async o => {
+    try{
+      const j = await api(`/api/productos/${pid}/rotacion`, {nivel});
+      p.rotacion_manual = nivel;
+      p.rotacion = nivel || p.rotacion_auto || 'baja';
+      o.remove();
+      toast(j.msg);
+      // se repinta el recuadro sin cerrar la ficha
+      const zona = document.getElementById('f-rot');
+      if(zona) zona.innerHTML = semaforoChico(p);
+      renderProductos();
+    }catch(e){ toast('✖ ' + e.message); }
+  };
+  if(!nivel){
+    return modal('↺ Volver a automática', `
+      <p>La rotación de <b>${esc(p.sku)}</b> volverá a calcularse <b>sola</b>, según
+      las unidades que se vendan.</p>
+      <div class="hint">Ahora mismo, por ventas, le corresponde
+        <b style="color:${ROTACION[p.rotacion_auto || 'baja'].color}">
+        ${ROTACION[p.rotacion_auto || 'baja'].t}</b>.</div>`,
+      [{t:'Cancelar'}, {t:'Sí, automática', p:1, f:aplicar}]);
+  }
+  const r = ROTACION[nivel];
+  modal('✋ Poner la rotación a mano', `
+    <p>Vas a marcar <b>${esc(p.sku)}</b> como
+      <b style="color:${r.color}">${r.icono} ${r.t}</b>.</p>
+    <div style="border:2px solid #E8A33D;background:#FFF8E7;border-radius:6px;
+         padding:8px 10px;font-size:12.5px;margin:8px 0">
+      ⚠️ <b>Aviso:</b> al ponerla a mano, este producto <b>dejará de actualizarse solo</b>
+      con las ventas. Se quedará en ${r.t} hasta que lo cambies o lo vuelvas a
+      poner en automática.
+    </div>
+    <div class="hint">Por sus ventas le correspondería
+      <b style="color:${ROTACION[p.rotacion_auto || 'baja'].color}">
+      ${ROTACION[p.rotacion_auto || 'baja'].t}</b>
+      (${fmt(p.vendidos || 0)} unidades en el periodo).</div>`,
+    [{t:'Cancelar'}, {t:'Sí, ponerla a mano', p:1, f:aplicar}]);
+}
+
+/* --- ventana ℹ️ INFO: todo el producto, solo lectura (doble clic) --- */
+function infoProducto(){
+  const p = selProd(); if(!p) return;
+  const prov = proveedores.find(x => x.codigo === p.proveedor);
+  const fila = (n, v) => `<tr>
+    <td style="padding:3px 12px 3px 0;color:#5A5856;font-weight:600;white-space:nowrap;vertical-align:top">${n}</td>
+    <td style="padding:3px 0;word-break:break-word">${v || '—'}</td></tr>`;
+  const ov = modal(`ℹ️ Información — ${esc(p.sku)}`, `
+    <div style="font-size:15px;font-weight:700;color:#252423">${esc(p.nombre)}</div>
+    <table style="border-collapse:collapse;font-size:12.5px;width:100%">
+      ${fila('Referencia (SKU)', `<span class="mono">${esc(p.sku)}</span>`)}
+      ${fila('Ref. fábrica (OEM)', esc(p.oem))}
+      ${fila('Proveedor', prov ? `${prov.codigo} — ${esc(prov.nombre)}` : (p.proveedor || ''))}
+      ${fila('Precio mínimo', p.precio_minimo ? '$' + fmt(p.precio_minimo) : '')}
+      ${fila('Precio normal', p.precio ? '$' + fmt(p.precio) : '')}
+      ${fila('Código de barras', p.codigo_barras ? `<span class="mono">${esc(cbCompleto(p))}</span>` : '')}
+      ${fila('Stock total', `<b>${fmt(p.cantidad_esperada)}</b>`)}
+      ${fila('Por bodega', `<span id="i-bod">cargando…</span>`)}
+      ${fila('📍 Posición', `<span id="i-pos">cargando…</span>`)}
+      ${fila('Etiquetas RFID', fmt(p.n_tags) + ' asociada(s)')}
+    </table>
+    <div style="font-size:12px;color:#5A5856;font-weight:600">Referencias aplicables
+      ${MODO === 'vendedor' ? `<span class="hint" style="font-weight:400">— puedes
+        corregirlas y guardar con el botón de abajo</span>` : ''}</div>
+    ${MODO === 'vendedor'
+      ? `<textarea id="i-refs-edit" style="width:100%;height:110px;box-sizing:border-box;
+              background:#FFFFFF;border:1px solid #C8C6C4;border-radius:4px;padding:6px 8px;
+              font-size:11.5px;margin-top:-6px;resize:vertical"
+              placeholder="cargando…"></textarea>`
+      : `<div id="i-refs" style="max-height:110px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+              background:#FBFAF9;border:1px solid #E7E5E3;border-radius:4px;padding:6px 8px;
+              font-size:11.5px;margin-top:-6px">cargando…</div>`}
+    <div class="fila2" style="align-items:start">
+      <div>
+        <div class="hint" style="margin:0 0 3px;text-align:center">📷 Foto</div>
+        <img id="i-foto" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
+        <div class="hint" id="i-foto-msg" style="text-align:center">buscando…</div>
+        <div style="margin-top:8px">${semaforoGrande(p)}</div>
+      </div>
+      <div>
+        <div class="hint" style="margin:0 0 3px;text-align:center">🏷️ Etiqueta código</div>
+        <img id="i-prev-cb" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
+        <div class="hint" id="i-prev-cb-msg" style="text-align:center">generando…</div>
+        <div class="hint" style="margin:6px 0 3px;text-align:center">📝 Etiqueta descripción</div>
+        <img id="i-prev-desc" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
+        <div class="hint" id="i-prev-desc-msg" style="text-align:center">generando…</div>
+      </div>
+    </div>`,
+    MODO === 'vendedor'
+      ? [{t:'💾 Guardar referencias', p:1, f:(o, btn) => guardarRefsVendedor(o, p, btn)},
+         {t:'Cerrar'}]
+      : [{t:'✏️ Modificar', f:o => { o.remove(); modificarProducto(); }},
+         {t:'🖨 Imprimir', f:o => { o.remove(); imprimirSel(); }},
+         {t:'Cerrar', p:1}]);
+  api(`/api/productos/${p.id}/referencias`).then(j => {
+    const el = ov.querySelector('#i-refs'), ed = ov.querySelector('#i-refs-edit');
+    if(el) el.textContent = (j.referencias || '').trim() || '—';
+    if(ed){ ed.value = j.referencias || ''; ed.placeholder = 'escribe aquí las referencias que le sirven a este repuesto';
+            ed.dataset.cargado = '1'; }
+  }).catch(() => {
+    const el = ov.querySelector('#i-refs'), ed = ov.querySelector('#i-refs-edit');
+    if(el) el.textContent = '✖ no se pudieron cargar';
+    if(ed) ed.placeholder = '✖ no se pudieron cargar (cierra y vuelve a abrir)';
+  });
+  api(`/api/productos/${p.id}/bodegas`).then(bs => {
+    const el = ov.querySelector('#i-bod');
+    if(el) el.textContent = bs.length
+      ? bs.map(b => `${b.bodega}: ${fmt(b.cantidad)}`).join('  ·  ')
+      : (p.ubicacion || '—');
+    const ep = ov.querySelector('#i-pos');
+    if(ep){
+      const conPos = bs.filter(b => b.posicion);
+      ep.innerHTML = conPos.length
+        ? conPos.map(b => `<b style="color:#B24B00">${esc(b.posicion)}</b>` +
+                          (bs.length > 1 ? ` <span style="color:#8A8886">(${esc(b.bodega)})</span>` : ''))
+                .join('  ·  ')
+        : '<span style="color:#8A8886">sin posición asignada</span>';
+    }
+  }).catch(() => {});
+  const foto = ov.querySelector('#i-foto'), fmsg = ov.querySelector('#i-foto-msg');
+  foto.onload = () => { foto.style.display = ''; fmsg.style.display = 'none'; };
+  foto.onerror = () => { fmsg.textContent = 'sin foto'; };
+  foto.src = `/api/productos/${p.id}/foto_img?t=${Date.now()}`;
+  for(const [url, id, msgErr] of [['/api/etiqueta/preview', 'i-prev-cb', '✖ esta vista necesita internet'],
+                                  ['/api/etiqueta/preview_desc', 'i-prev-desc', '✖ no se pudo generar']]){
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({sku: p.sku})})
+      .then(r => r.ok ? r.blob() : null)
+      .then(b => {
+        const img = ov.querySelector('#' + id), m = ov.querySelector('#' + id + '-msg');
+        if(!img || !img.isConnected) return;
+        if(b){ img.src = URL.createObjectURL(b); img.style.display = ''; if(m) m.style.display = 'none'; }
+        else if(m) m.textContent = msgErr;
+      })
+      .catch(() => { const m = ov.querySelector('#' + id + '-msg'); if(m) m.textContent = msgErr; });
+  }
+}
+function eliminarProducto(){
+  const p = selProd(); if(!p) return;
+  modal('Eliminar producto',
+    `<div class="hint">Se eliminará <b>${esc(p.sku)} — ${esc(p.nombre)}</b> y sus
+     ${fmt(p.n_tags)} etiqueta(s) asociada(s). Esta acción no se puede deshacer.</div>`,
+    [{t:'Cancelar'}, {t:'Eliminar', r:1, f:async ov => {
+      try{ await api(`/api/productos/${p.id}/eliminar`, {});
+        ov.remove(); selId = null; toast('✔ Producto eliminado'); await cargarProductos();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+async function mandarAjuste(p, delta, motivo){
+  try{
+    const j = await api(`/api/productos/${p.id}/cantidad`,
+                        {delta:String(delta), motivo: motivo || 'venta'});
+    p.cantidad_esperada = j.cantidad; renderProductos();
+    bmsg(`${p.sku}: stock ajustado a ${fmt(j.cantidad)}` +
+         (delta < 0 ? (motivo === 'ajuste' ? ' (solo ajuste)' : ' (venta)') : ''));
+  }catch(e){ toast('✖ ' + e.message); }
+}
+function ajustar(delta){
+  const p = selProd(); if(!p) return;
+  if(delta > 0){ mandarAjuste(p, delta, 'venta'); return; }   // sumar: sin pregunta
+  // al RESTAR se pregunta el motivo: solo las VENTAS cuentan en «más vendidos»
+  modal('Restar 1 — ' + esc(p.sku),
+    `<div class="hint">${esc(p.nombre)} · stock actual: <b>${fmt(p.cantidad_esperada)}</b></div>
+     <div style="font-size:13.5px;color:#252423">¿Por qué sale esta unidad?</div>
+     <div class="hint">🛒 <b>Venta</b> cuenta en «🏆 Más vendidos». ·
+     🔧 <b>Solo ajuste</b> (corrección, daño, préstamo…) no cuenta.</div>`,
+    [{t:'Cancelar'},
+     {t:'🔧 Solo ajuste', f:o => { o.remove(); mandarAjuste(p, delta, 'ajuste'); }},
+     {t:'🛒 Venta', p:1, f:o => { o.remove(); mandarAjuste(p, delta, 'venta'); }}]);
+}
+function leerFilasBodega(raiz){
+  const bodegas = [];
+  raiz.querySelectorAll('#f-bodegas > div').forEach(r => {
+    let nom = r.querySelector('.b-nom').value.trim().toUpperCase();
+    if(nom === '__OTRA__') nom = '';
+    const cant = +r.querySelector('.b-cant').value || 0;
+    const cp = r.querySelector('.b-pos');
+    const pos = cp ? cp.value.trim().toUpperCase() : '';
+    if(nom || cant > 0 || pos)
+      bodegas.push({bodega: nom || 'ALMACEN', cantidad: cant, posicion: pos});
+  });
+  return bodegas;
+}
+async function fijarCantidad(){
+  const p = selProd(); if(!p) return;
+  let bod = [];
+  try{ bod = await api(`/api/productos/${p.id}/bodegas`); }catch(e){}
+  if(!bod.length) bod = [{bodega: p.ubicacion || '', cantidad: p.cantidad_esperada}];
+  modal('Fijar stock — ' + esc(p.sku),
+    `<div class="hint">${esc(p.nombre)}</div>
+     <div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:6px">Existencias por bodega</div>
+     <div id="f-bodegas">${bod.map(filaBodegaHtml).join('')}</div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
+       <button class="btn mini" type="button" onclick="agregarFilaBodega()">➕ Otra bodega</button>
+       <span class="hint" style="margin:0">Stock total:
+         <b id="f-total">${fmt(bod.reduce((a, b) => a + (+b.cantidad || 0), 0))}</b></span>
+     </div>`,
+    [{t:'Cancelar'}, {t:'Guardar', p:1, f:async ov => {
+      const bodegas = leerFilasBodega(ov);
+      const total = bodegas.reduce((a, b) => a + (+b.cantidad || 0), 0);
+      const guardar = async motivo => {
+        try{
+          const j = await api(`/api/productos/${p.id}/bodegas`, {bodegas, motivo});
+          p.cantidad_esperada = j.cantidad; p.ubicacion = j.ubicacion; renderProductos();
+          ov.remove(); toast(`✔ ${p.sku}: stock fijado en ${fmt(j.cantidad)}`
+                             + (motivo === 'ajuste' ? ' (solo ajuste)' : ''));
+        }catch(e){ toast('✖ ' + e.message); }
+      };
+      if(total >= (p.cantidad_esperada || 0)){ guardar('venta'); return; }
+      // el stock BAJA: se pregunta si fue venta o solo un ajuste
+      modal('El stock baja de ' + fmt(p.cantidad_esperada) + ' a ' + fmt(total),
+        `<div class="hint">Salen <b>${fmt(p.cantidad_esperada - total)}</b> unidades de
+         <b>${esc(p.sku)}</b>. ¿Por qué motivo?</div>
+         <div class="hint">🛒 <b>Venta</b> cuenta en «🏆 Más vendidos». ·
+         🔧 <b>Solo ajuste</b> (corrección, daño…) no cuenta.</div>`,
+        [{t:'Cancelar'},
+         {t:'🔧 Solo ajuste', f:o => { o.remove(); guardar('ajuste'); }},
+         {t:'🛒 Venta', p:1, f:o => { o.remove(); guardar('venta'); }}]);
+    }}]);
+}
+function imprimirSel(){
+  const p = selProd(); if(!p) return;
+  const ov = modal('Imprimir etiquetas — ' + esc(p.sku),
+    `<div class="hint">${esc(p.nombre)}</div>
+     <label>Número de etiquetas<input id="f-cop" type="number" min="1" value="1"></label>
+     <div style="font-size:12px;font-weight:600;color:#5A5856;margin-top:8px">🏷️ Código de barras</div>
+     <div style="display:flex;gap:6px;margin-top:2px">
+       <button class="btn prim" id="b-cbz" style="flex:1">🖨 En la Zebra (con chip)</button>
+       <button class="btn" id="b-cbs" style="flex:1">🏷️ En la SAT</button>
+     </div>
+     <div style="font-size:12px;font-weight:600;color:#5A5856;margin-top:10px">📝 Descripción</div>
+     <div style="display:flex;gap:6px;margin-top:2px">
+       <button class="btn prim" id="b-dz" style="flex:1">🖨 En la Zebra (con chip)</button>
+       <button class="btn" id="b-ds" style="flex:1">📝 En la SAT</button>
+     </div>
+     <div class="hint" style="margin-top:8px">La <b>Zebra</b> graba el chip RFID y asocia la
+     etiqueta al producto. La <b>SAT</b> imprime la misma etiqueta pero sin chip
+     (esa impresora no sabe grabar chips).</div>`,
+    [{t:'Cerrar', p:0}]);
+  const cop = () => +ov.querySelector('#f-cop').value || 1;
+  const hacer = (btn, url, luego) => {
+    const t0 = btn.textContent; btn.disabled = true; btn.textContent = 'Imprimiendo…';
+    api(url, {copias: cop()})
+      .then(j => { ov.remove(); toast(j.msg); if(luego) luego(); })
+      .catch(e => { toast('✖ ' + e.message); btn.disabled = false; btn.textContent = t0; });
+  };
+  ov.querySelector('#b-cbz').onclick = e => hacer(e.target, `/api/productos/${p.id}/imprimir`, cargarProductos);
+  ov.querySelector('#b-cbs').onclick = e => hacer(e.target, `/api/productos/${p.id}/imprimir_codigo_sat`);
+  ov.querySelector('#b-dz').onclick  = e => hacer(e.target, `/api/productos/${p.id}/imprimir_desc_zebra`, cargarProductos);
+  ov.querySelector('#b-ds').onclick  = e => hacer(e.target, `/api/productos/${p.id}/imprimir_desc`);
+}
+function asociarTag(){
+  const p = selProd(); if(!p) return;
+  modal('Asociar etiqueta — ' + esc(p.sku),
+    `<div class="hint">${esc(p.nombre)}</div>
+     <label>EPC de la etiqueta<input id="f-epc" placeholder="AF01… / E280…" class="mono"></label>
+     <div class="hint">También puedes asociar desde la pistola con el botón ASOCIAR.</div>`,
+    [{t:'Cancelar'}, {t:'Asociar', p:1, f:async ov => {
+      const epc = ov.querySelector('#f-epc').value.trim();
+      if(!epc){ toast('Escribe el EPC'); return; }
+      try{
+        await api('/api/tags', {epc, sku:p.sku});
+        ov.remove(); toast('✔ Etiqueta asociada a ' + p.sku); cargarProductos();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+
+/* ---------------- INVENTARIO: sesiones ---------------- */
+let sesiones = [], sesionVista = null, sesEstado = '', sesTipo = '', sesBodega = '',
+    sesSeleccion = 0, resumen = [];
+
+async function verSesiones(){
+  mostrarVista('sesiones');
+  try{
+    sesiones = await api('/api/sesiones');
+    document.querySelector('#t-sesiones tbody').innerHTML = sesiones.length
+      ? sesiones.map(s => `<tr data-id="${s.id}">
+          <td>${s.id}</td><td>${esc(s.nombre)}</td>
+          <td><span class="chip ${s.tipo === 'total' ? 'total' : 'verificacion'}">${s.tipo === 'total' ? 'Conteo total' : 'Verificación'}</span>${s.bodega ? ` <span class="chip">${esc(s.bodega)}</span>` : ''}${s.np ? ` <span class="chip">🎯 ${fmt(s.np)} productos</span>` : ''}</td>
+          <td><span class="chip ${s.estado}">${esc(s.estado)}</span></td>
+          <td class="num">${fmt(s.n)}</td><td>${fecha(s.creada)}</td>
+          <td><button class="btn mini rojo" title="Borrar esta sesión"
+              onclick="event.stopPropagation();eliminarSesion(${s.id}, ${s.n})">🗑</button></td></tr>`).join('')
+      : `<tr><td colspan="7" style="text-align:center;color:#8A8886;padding:34px">
+           Aún no hay sesiones — crea una con «Nueva sesión»</td></tr>`;
+    bcont(`${fmt(sesiones.length)} sesiones de conteo`);
+  }catch(e){ toast('✖ ' + e.message); }
+}
+document.querySelector('#t-sesiones tbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr');
+  if(tr && tr.dataset.id) verSesion(+tr.dataset.id);
+});
+function eliminarSesion(sid, lecturas){
+  const s = sesiones.find(x => x.id === sid) || {};
+  modal('Borrar sesión #' + sid,
+    `<div class="hint">Se borrará la sesión <b>${esc(s.nombre || sid)}</b>
+     ${s.estado === 'abierta' ? '(que está <b>ABIERTA</b>) ' : ''}con sus
+     <b>${fmt(lecturas || 0)} lecturas</b>. El stock de los productos
+     <b>NO cambia</b> — solo se borra el registro del conteo.</div>`,
+    [{t:'Cancelar', p:1}, {t:'🗑 Borrar', r:1, f:async ov => {
+      try{
+        const j = await api(`/api/sesiones/${sid}/eliminar`, {});
+        ov.remove(); toast(j.msg); verSesiones();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+
+/* --- elegir SOLO ciertos productos para el conteo --- */
+let sesSel = [];
+function sesPickFiltra(q){
+  q = (q || '').trim().toLowerCase();
+  const res = document.getElementById('f-ses-res');
+  if(!res) return;
+  if(!q){ res.innerHTML = '<div class="hint" style="padding:6px">escribe arriba para buscar…</div>'; return; }
+  const ya = new Set(sesSel.map(x => x.id));
+  const arr = productos.filter(p => !ya.has(p.id) &&
+    (p.sku + ' ' + p.nombre + ' ' + (p.oem || '')).toLowerCase().includes(q)).slice(0, 30);
+  res.innerHTML = arr.length ? arr.map(p =>
+    `<div onclick="sesPickAgrega(${p.id})">➕ ${esc(p.sku)} — ${esc(p.nombre)}</div>`).join('')
+    : '<div class="hint" style="padding:6px">sin resultados</div>';
+}
+function sesPickAgrega(id){
+  const p = productos.find(x => x.id === id);
+  if(p && !sesSel.some(x => x.id === id)) sesSel.push({id: p.id, sku: p.sku});
+  sesPickPinta();
+  const b = document.getElementById('f-ses-busca');
+  if(b) sesPickFiltra(b.value);
+}
+function sesPickQuita(id){ sesSel = sesSel.filter(x => x.id !== id); sesPickPinta(); }
+function sesPickPinta(){
+  const el = document.getElementById('f-ses-elegidos');
+  if(!el) return;
+  el.innerHTML = sesSel.length
+    ? sesSel.map(x => `<span class="chip">${esc(x.sku)}
+        <b style="cursor:pointer" onclick="sesPickQuita(${x.id})" title="Quitar">✖</b></span>`).join(' ')
+      + ` <span class="hint">(${sesSel.length} elegidos)</span>`
+    : '<span class="hint">aún no has elegido ninguno</span>';
+}
+function nuevaSesion(){
+  sesSel = [];
+  modal('Nueva sesión de conteo',
+    `<label>Nombre (opcional)<input id="f-ses" placeholder="Conteo bodega 3…"></label>
+     <label>Bodega que se va a contar
+       <select id="f-ses-bod">
+         <option value="">— todas (inventario completo) —</option>
+         ${bodegasLista.map(b => `<option>${esc(b)}</option>`).join('')}
+       </select>
+     </label>
+     <label>Productos a contar
+       <select id="f-ses-que" onchange="const p=document.getElementById('f-ses-pick');
+               p.style.display=this.value==='algunos'?'':'none';">
+         <option value="todos">Todos los productos</option>
+         <option value="algunos">Solo los que yo elija…</option>
+       </select>
+     </label>
+     <div id="f-ses-pick" style="display:none">
+       <input id="f-ses-busca" placeholder="🔍 busca por código o nombre y tócalo para agregarlo"
+              oninput="sesPickFiltra(this.value)" autocomplete="off">
+       <div id="f-ses-res" class="combo-lista" style="position:static;max-height:130px;margin-top:4px;border-radius:4px"></div>
+       <div id="f-ses-elegidos" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;align-items:center"></div>
+     </div>
+     <label class="radio"><input type="radio" name="f-tipo" value="verificacion" checked>
+       <span><b>Verificación</b> — compara lo contado contra el stock actual</span></label>
+     <label class="radio"><input type="radio" name="f-tipo" value="total">
+       <span><b>Conteo total</b> — al cerrarla, lo contado se vuelve la cantidad oficial</span></label>
+     <div class="hint">Si eliges una bodega, el avance compara contra el stock de ESA
+     bodega, y el conteo total solo actualiza esa bodega (las demás no se tocan).
+     Si eliges ciertos productos, el conteo solo mira y ajusta ESOS productos.
+     Al crearla se cierra automáticamente la sesión que esté abierta.</div>`,
+    [{t:'Cancelar'}, {t:'Crear sesión', p:1, f:async ov => {
+      try{
+        const tipo = ov.querySelector('input[name=f-tipo]:checked').value;
+        const algunos = ov.querySelector('#f-ses-que').value === 'algunos';
+        if(algunos && !sesSel.length){
+          toast('Elige al menos un producto (o cambia a «Todos los productos»)');
+          return;
+        }
+        const j = await api('/api/sesiones/nueva', {nombre:ov.querySelector('#f-ses').value, tipo,
+          bodega:ov.querySelector('#f-ses-bod').value,
+          productos: algunos ? sesSel.map(x => x.id) : []});
+        ov.remove(); toast('✔ Sesión creada — ya puedes leer con la pistola');
+        verSesion(j.id);
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+  sesPickPinta();
+  sesPickFiltra('');
+}
+
+async function verSesion(sid){
+  sesionVista = sid; mostrarVista('sesion');
+  // al abrir una sesión los filtros arrancan ocultos y limpios
+  const g = id => document.getElementById(id);
+  g('ses-filtros').classList.add('oculta');
+  g('ses-buscar').value = ''; g('ses-bod').value = ''; g('ses-dif').value = '';
+  g('ses-mov').checked = true;
+  const bf = g('ses-btn-filtros'); if(bf) bf.classList.remove('prim');
+  await cargarResumen();
+}
+async function cargarResumen(){
+  if(!sesionVista) return;
+  try{
+    const j = await api(`/api/sesiones/${sesionVista}/resumen`);
+    const s = j.sesion || {};
+    sesEstado = s.estado || ''; sesTipo = s.tipo || 'verificacion'; sesBodega = s.bodega || '';
+    sesSeleccion = j.seleccion || 0;
+    document.getElementById('ses-tit').textContent = s.nombre || ('Sesión ' + sesionVista);
+    document.getElementById('ses-chips').innerHTML =
+      `<span class="chip ${sesTipo === 'total' ? 'total' : 'verificacion'}">${sesTipo === 'total' ? 'Conteo total' : 'Verificación'}</span>
+       ${s.bodega ? `<span class="chip">📦 ${esc(s.bodega)}</span>` : ''}
+       ${j.seleccion ? `<span class="chip">🎯 ${fmt(j.seleccion)} productos elegidos</span>` : ''}
+       <span class="chip ${esc(sesEstado)}">${esc(sesEstado)}</span>`;
+    document.getElementById('btn-cerrar-ses').style.display = sesEstado === 'abierta' ? '' : 'none';
+    resumen = j.resumen || [];
+    renderResumen();
+  }catch(e){ toast('✖ ' + e.message); }
+}
+/* los filtros del avance viven ocultos: aparecen al tocar 🔎 Filtros */
+function toggleFiltrosSes(){
+  const p = document.getElementById('ses-filtros');
+  const ver = p.classList.contains('oculta');
+  p.classList.toggle('oculta', !ver);
+  if(ver){ poblarFiltrosSes(); const b = document.getElementById('ses-buscar'); if(b) b.focus(); }
+}
+function poblarFiltrosSes(){
+  const sb = document.getElementById('ses-bod');
+  if(!sb) return;
+  const v = sb.value;
+  // bodegas que realmente aparecen en este avance + las conocidas
+  const enResumen = new Set();
+  resumen.forEach(r => String(r.ubicacion || '').split(',').forEach(x => {
+    const t = x.trim().toUpperCase(); if(t) enResumen.add(t);
+  }));
+  const ops = [...new Set([...enResumen, ...bodegasLista])];
+  sb.innerHTML = '<option value="">todas</option>' + ops.map(o => `<option>${esc(o)}</option>`).join('');
+  sb.value = v;
+}
+function limpiarFiltrosSes(){
+  document.getElementById('ses-buscar').value = '';
+  document.getElementById('ses-bod').value = '';
+  document.getElementById('ses-dif').value = '';
+  document.getElementById('ses-mov').checked = true;
+  renderResumen(true);
+}
+function renderResumen(subirTabla){
+  const palSes = palabrasDe(document.getElementById('ses-buscar').value);
+  const f = (document.getElementById('ses-buscar').value || '').toLowerCase();
+  const bod = (document.getElementById('ses-bod').value || '').toUpperCase();
+  const dif = document.getElementById('ses-dif').value || '';
+  const soloMov = document.getElementById('ses-mov').checked;
+  const arr = resumen.filter(r => {
+    if(soloMov && !r.leidos && !r.cantidad_esperada) return false;
+    if(palSes.length && !coincide(r.sku + ' ' + r.nombre + ' ' + (r.ubicacion||'') + ' ' +
+                                  (r.codigo_barras||'') + ' ' + (r.codigo_barras_ean||''),
+                                  palSes)) return false;
+    if(bod && !String(r.ubicacion||'').toUpperCase().includes(bod)) return false;
+    if(dif){
+      const d = r.leidos - r.cantidad_esperada;
+      if(dif === 'falta' && !(d < 0)) return false;
+      if(dif === 'sobra' && !(d > 0)) return false;
+      if(dif === 'ok' && d !== 0) return false;
+      if(dif === 'leidos' && !(r.leidos > 0)) return false;
+      if(dif === 'sin' && r.leidos > 0) return false;
+    }
+    return true;
+  });
+  // el total se suma aparte: la tabla ya no dibuja todas las filas
+  let leidosTot = 0;
+  for(const r of arr) leidosTot += r.leidos;
+  tablaSesion.mostrar(arr, subirTabla);
+  // resalta el botón 🔎 si hay algún filtro activo (aunque el panel esté oculto)
+  const activo = f || bod || dif || !soloMov;
+  const bf = document.getElementById('ses-btn-filtros');
+  if(bf) bf.classList.toggle('prim', !!activo);
+  const txtc = `${fmt(arr.length)} productos · ${fmt(leidosTot)} unidades contadas`;
+  bcont(txtc);
+  const cu = document.getElementById('ses-cuenta'); if(cu) cu.textContent = txtc;
+}
+function cerrarSesionUI(){
+  const esTotal = sesTipo === 'total';
+  modal('Cerrar sesión', esTotal
+    ? `<div class="hint">⚠️ Esta sesión es de <b>CONTEO TOTAL${sesBodega ? ' de ' + esc(sesBodega) : ''}</b>:
+       al cerrarla, lo contado se convierte en la cantidad oficial de cada producto
+       etiquetado${sesBodega ? ` <b>en ${esc(sesBodega)}</b> (las demás bodegas no se tocan)` : ''}.
+       Los productos con etiquetas que no se leyeron quedarán en <b>0</b>${sesBodega ? ' en esa bodega' : ''}.
+       ${sesSeleccion ? `Solo se ajustan los <b>${fmt(sesSeleccion)} productos elegidos</b> para esta sesión; el resto no se toca.` : ''}</div>`
+    : `<div class="hint">La sesión se cerrará y dejará de recibir lecturas de la pistola.</div>`,
+    [{t:'Cancelar'}, {t:'Cerrar sesión', p:!esTotal, r:esTotal, f:async ov => {
+      try{
+        const j = await api(`/api/sesiones/${sesionVista}/cerrar`, {});
+        ov.remove(); toast(j.msg || '✔ Sesión cerrada'); cargarResumen();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+/* refresco en vivo del avance mientras la sesión está abierta */
+setInterval(() => {
+  if(vista === 'sesion' && sesEstado === 'abierta' && !document.querySelector('.overlay'))
+    cargarResumen();
+}, 4000);
+
+/* con varios PCs conectados: la tabla de productos se refresca sola para
+   mostrar los cambios hechos desde otros equipos.
+   Con miles de productos la lista pesa MB, así que solo se refresca si la
+   ventana está a la vista y nadie está trabajando en ella (ni buscando, ni
+   con una ficha abierta, ni desplazando la tabla). */
+let ultimoUso = Date.now();
+['mousemove','keydown','wheel','click'].forEach(ev =>
+  document.addEventListener(ev, () => { ultimoUso = Date.now(); }, {passive: true}));
+setInterval(() => {
+  if(document.hidden) return;                       // ventana minimizada/tapada
+  if(Date.now() - ultimoUso < 4000) return;         // se está usando ahora mismo
+  if(vista === 'productos' && !document.querySelector('.overlay') &&
+     document.activeElement !== document.getElementById('buscar'))
+    cargarProductos();
+}, 30000);
+
+/* ---------------- ESTADÍSTICAS: productos que más se venden ---------------- */
+let vtaPeriodo = 'mes';
+let vtaTipo = localStorage.getItem('vta_tipo') || 'barras';
+function periodoVentas(p){
+  vtaPeriodo = p;
+  ['dia', 'mes', 'ano'].forEach(x => {
+    const b = document.getElementById('vta-' + x);
+    if(b) b.classList.toggle('prim', x === p);
+  });
+  verVentas();
+}
+function tipoGrafica(t){
+  vtaTipo = t;
+  try{ localStorage.setItem('vta_tipo', t); }catch(e){}
+  verVentas();
+}
+function pintarBotonesTipo(){
+  ['barras', 'columnas', 'torta', 'linea'].forEach(x => {
+    const b = document.getElementById('vtg-' + x);
+    if(b) b.classList.toggle('prim', x === vtaTipo);
+  });
+}
+/* paleta categórica de la torta (validada para daltonismo; 'Otros' en gris) */
+const PAL_CAT = ['#2a78d6', '#008300', '#e87ba4', '#eda100',
+                 '#1baf7a', '#eb6834', '#4a3aa7', '#e34948'];
+function grafBarras(prods){
+  const top = prods.slice(0, 15);
+  const max = top[0].unidades || 1;
+  return top.map((p, i) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-top:${i ? 7 : 0}px">
+      <div style="width:230px;flex:none;text-align:right;font-size:12px;overflow:hidden;
+                  text-overflow:ellipsis;white-space:nowrap" title="${esc(p.sku + ' — ' + p.nombre)}">
+        <b>${esc(p.sku)}</b> <span style="color:#5A5856">${esc(p.nombre)}</span></div>
+      <div style="flex:1;background:#F3F2F1;border-radius:4px">
+        <div style="width:${Math.max(3, p.unidades / max * 100)}%;background:#E87722;
+                    color:#fff;font-size:12px;font-weight:700;padding:4px 8px;
+                    white-space:nowrap;border-radius:4px;box-sizing:border-box">${fmt(p.unidades)}</div>
+      </div>
+    </div>`).join('');
+}
+function grafColumnas(prods){
+  const top = prods.slice(0, 12);
+  const max = top[0].unidades || 1;
+  return `<div style="display:flex;align-items:flex-end;gap:10px;height:250px;
+                      border-bottom:1.5px solid #E1DFDD;padding:0 8px">
+    ${top.map(p => `
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
+                  justify-content:flex-end;height:100%" title="${esc(p.sku + ' — ' + p.nombre + ': ' + fmt(p.unidades))}">
+        <div style="font-size:11.5px;font-weight:700;color:#252423">${fmt(p.unidades)}</div>
+        <div style="width:68%;max-width:46px;height:${Math.max(4, p.unidades / max * 195)}px;
+                    background:#E87722;border-radius:4px 4px 0 0;margin-top:3px"></div>
+      </div>`).join('')}
+  </div>
+  <div style="display:flex;gap:10px;padding:4px 8px 0">
+    ${top.map(p => `<div style="flex:1;min-width:0;text-align:center;font-size:10.5px;color:#5A5856;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.sku)}">${esc(p.sku)}</div>`).join('')}
+  </div>`;
+}
+function grafTorta(prods){
+  const top = prods.slice(0, 8);
+  const resto = prods.slice(8).reduce((a, p) => a + p.unidades, 0);
+  const datos = top.map((p, i) => ({n: p.sku, det: p.nombre, v: p.unidades, c: PAL_CAT[i]}));
+  if(resto) datos.push({n: 'Otros', det: prods.length - 8 + ' productos más', v: resto, c: '#8A8886'});
+  const sum = datos.reduce((a, x) => a + x.v, 0) || 1;
+  const R = 118, cx = 128, cy = 128;
+  let ang = -Math.PI / 2, trozos = '';
+  if(datos.length === 1){
+    trozos = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${datos[0].c}" stroke="#fff" stroke-width="2">
+      <title>${esc(datos[0].n)}: ${fmt(datos[0].v)} (100%)</title></circle>`;
+  }else{
+    trozos = datos.map(x => {
+      const a2 = ang + x.v / sum * 2 * Math.PI;
+      const grande = (a2 - ang) > Math.PI ? 1 : 0;
+      const x1 = cx + R * Math.cos(ang), y1 = cy + R * Math.sin(ang);
+      const x2 = cx + R * Math.cos(a2), y2 = cy + R * Math.sin(a2);
+      ang = a2;
+      return `<path d="M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)}
+                A${R},${R} 0 ${grande} 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z"
+                fill="${x.c}" stroke="#fff" stroke-width="2">
+        <title>${esc(x.n)}: ${fmt(x.v)} (${Math.round(x.v / sum * 100)}%)</title></path>`;
+    }).join('');
+  }
+  return `<div style="display:flex;gap:26px;align-items:center;flex-wrap:wrap">
+    <svg width="256" height="256" viewBox="0 0 256 256" style="flex:none">${trozos}</svg>
+    <div style="flex:1;min-width:240px">
+      ${datos.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12.5px"
+             title="${esc(x.det)}">
+          <span style="width:13px;height:13px;border-radius:3px;background:${x.c};flex:none"></span>
+          <b>${esc(x.n)}</b>
+          <span style="color:#5A5856;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(x.det)}</span>
+          <span style="flex:none"><b>${fmt(x.v)}</b> · ${Math.round(x.v / sum * 100)}%</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function grafLinea(serie){
+  if(!serie || !serie.length) return '<div class="hint">Sin datos del periodo.</div>';
+  const W = 900, H = 250, mL = 46, mR = 14, mT = 14, mB = 26;
+  const max = Math.max(1, ...serie.map(s => s.unidades));
+  const px = i => serie.length === 1 ? (mL + (W - mL - mR) / 2)
+                : mL + i * (W - mL - mR) / (serie.length - 1);
+  const py = v => mT + (1 - v / max) * (H - mT - mB);
+  const pts = serie.map((s, i) => `${px(i).toFixed(1)},${py(s.unidades).toFixed(1)}`).join(' ');
+  const paso = Math.ceil(serie.length / 14);   // que las etiquetas no se amontonen
+  const rejilla = [0, 0.5, 1].map(f => {
+    const v = Math.round(max * f), y = py(v);
+    return `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" stroke="#EDEBE9" stroke-width="1"/>
+            <text x="${mL - 7}" y="${y + 4}" text-anchor="end" font-size="11" fill="#8A8886">${fmt(v)}</text>`;
+  }).join('');
+  const puntos = serie.map((s, i) => `
+    <circle cx="${px(i).toFixed(1)}" cy="${py(s.unidades).toFixed(1)}" r="4"
+            fill="#E87722" stroke="#fff" stroke-width="1.5">
+      <title>${esc(s.etiqueta)}: ${fmt(s.unidades)} unidades</title></circle>`).join('');
+  const etiquetas = serie.map((s, i) => i % paso ? '' : `
+    <text x="${px(i).toFixed(1)}" y="${H - 8}" text-anchor="middle"
+          font-size="11" fill="#5A5856">${esc(s.etiqueta)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:290px;font-family:'Segoe UI',Arial">
+    ${rejilla}
+    <polyline points="${pts}" fill="none" stroke="#E87722" stroke-width="2"
+              stroke-linejoin="round" stroke-linecap="round"/>
+    ${puntos}${etiquetas}
+  </svg>
+  <div class="hint" style="text-align:center;margin-top:-4px">Unidades salidas
+    ${vtaPeriodo === 'dia' ? 'por hora' : vtaPeriodo === 'ano' ? 'por mes' : 'por día del mes'}
+    (pasa el mouse por los puntos)</div>`;
+}
+async function verVentas(){
+  mostrarVista('ventas');
+  pintarBotonesTipo();
+  const cuerpo = document.getElementById('vta-cuerpo');
+  try{
+    const j = await api('/api/estadisticas/ventas?periodo=' + vtaPeriodo);
+    const nom = {dia:'hoy', mes:'este mes', ano:'este año'}[j.periodo] || '';
+    if(!j.productos.length){
+      cuerpo.innerHTML = `<div style="text-align:center;color:#8A8886;padding:60px 20px;font-size:14px">
+        Aún no hay ventas registradas ${nom}.<br><br>
+        <span class="hint">Cuando el stock de un producto baja con <b>Restar 1</b> o
+        <b>Fijar stock</b>, el programa pregunta si fue 🛒 venta o 🔧 solo ajuste:
+        aquí solo cuentan las VENTAS (los cierres de conteo e importaciones también
+        cuentan). El ranking y su gráfica aparecen solos con el uso.</span></div>`;
+      bcont('Sin ventas ' + nom);
+      return;
+    }
+    const grafica =
+      vtaTipo === 'columnas' ? grafColumnas(j.productos) :
+      vtaTipo === 'torta'    ? grafTorta(j.productos) :
+      vtaTipo === 'linea'    ? grafLinea(j.serie) :
+                               grafBarras(j.productos);
+    cuerpo.innerHTML = `
+      <div style="font-size:13px;color:#5A5856;margin-bottom:14px">
+        <b style="font-size:17px;color:#252423">${fmt(j.total_unidades)}</b> unidades salieron ${nom}
+        · ${fmt(j.productos.length)} producto(s) con movimiento</div>
+      ${grafica}
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:24px">
+        <thead><tr style="color:#5A5856;text-align:left">
+          <th style="padding:6px;width:34px">#</th><th style="padding:6px;width:130px">Código</th>
+          <th style="padding:6px">Nombre</th>
+          <th style="padding:6px;text-align:right;width:120px">Unidades vendidas</th>
+          <th style="padding:6px;text-align:right;width:70px">Veces</th>
+          <th style="padding:6px;text-align:right;width:95px">Stock actual</th></tr></thead>
+        <tbody>${j.productos.map((p, i) => `
+          <tr style="border-top:1px solid #EDEBE9">
+            <td style="padding:6px;color:#8A8886">${i + 1}</td>
+            <td style="padding:6px" class="mono">${esc(p.sku)}</td>
+            <td style="padding:6px">${esc(p.nombre)}</td>
+            <td style="padding:6px;text-align:right"><b>${fmt(p.unidades)}</b></td>
+            <td style="padding:6px;text-align:right">${fmt(p.veces)}</td>
+            <td style="padding:6px;text-align:right;${p.stock === 0 ? 'color:#C4314B;font-weight:700' : ''}">${fmt(p.stock)}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+      <div class="hint" style="margin-top:10px">«Veces» = cuántos movimientos de bajada tuvo.
+      Stock en rojo = agotado.</div>`;
+    bcont(`${fmt(j.productos.length)} productos con salidas ${nom}`);
+  }catch(e){ toast('✖ ' + e.message); }
+}
+
+/* ---------------- INVENTARIO: desconocidos ---------------- */
+function badgeDesc(n){
+  const b = document.getElementById('badge-desc');
+  b.textContent = n; b.style.display = n > 0 ? '' : 'none';
+}
+async function verDesconocidos(){
+  mostrarVista('desconocidos');
+  try{
+    const rows = await api('/api/desconocidos');
+    document.querySelector('#t-desc tbody').innerHTML = rows.length
+      ? rows.map(r => `<tr><td class="mono">${esc(r.epc)}</td>
+          <td class="num">${fmt(r.veces)}</td><td>${fecha(r.ultima)}</td>
+          <td><button class="btn mini prim" onclick="asignarDesc('${esc(r.epc)}')">Asignar</button>
+              <button class="btn mini" onclick="ignorarDesc('${esc(r.epc)}')">Ignorar</button></td></tr>`).join('')
+      : `<tr><td colspan="4" style="text-align:center;color:#8A8886;padding:34px">
+           No hay etiquetas desconocidas 🎉</td></tr>`;
+    badgeDesc(rows.length);
+    bcont(`${fmt(rows.length)} etiquetas desconocidas`);
+  }catch(e){ toast('✖ ' + e.message); }
+}
+function asignarDesc(epc){
+  modal('Asignar etiqueta',
+    `<div class="hint mono">${esc(epc)}</div>
+     <label>Código (SKU) del producto<input id="f-sku-d" placeholder="Ej: LM21604"></label>`,
+    [{t:'Cancelar'}, {t:'Asignar', p:1, f:async ov => {
+      const sku = ov.querySelector('#f-sku-d').value.trim();
+      if(!sku){ toast('Escribe el código del producto'); return; }
+      try{
+        await api('/api/tags', {epc, sku});
+        ov.remove(); toast(`✔ ${epc} → ${sku}`); verDesconocidos();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+async function ignorarDesc(epc){
+  try{
+    await api('/api/ignorar', {epc});
+    toast('✔ EPC ignorado — no volverá a aparecer'); verDesconocidos();
+  }catch(e){ toast('✖ ' + e.message); }
+}
+
+/* ---------------- editor VISUAL de diseño de etiqueta ---------------- */
+/* Hay DOS etiquetas: 'cb' = código de barras (Zebra, con chip) y
+   'desc' = descripción (impresora SAT, blanca). diseno apunta a la activa. */
+let diseno = null, disenos = null, origs = null, disTab = 'cb';
+let cfgEtq = null, disSel = null, disZoom = 1;
+const EPC_MUESTRA = 'AF010001230000015AB4C2D9';
+/* tipo: bloque = texto con ancho y alineación · libre = texto suelto ·
+   raya = línea · caja = rectángulo · codigo = código de barras */
+const DIS_ELEM = {
+  oem:      {n:'Línea OEM',          tipo:'bloque'},
+  raya1:    {n:'Raya superior',      tipo:'raya'},
+  nombre:   {n:'Nombre del producto',tipo:'bloque'},
+  raya2:    {n:'Raya inferior',      tipo:'raya'},
+  codigo:   {n:'Código de barras',   tipo:'codigo'},
+  sku:      {n:'Referencia (sobre la foto)', tipo:'bloque'},
+  foto:     {n:'Foto del producto',  tipo:'caja'},
+  precio:   {n:'Precio ($)',         tipo:'libre'},
+  ubicacion:{n:'Bodega (U:)',        tipo:'libre'},
+  web:      {n:'Pie (página web)',   tipo:'bloque'},
+  epc:      {n:'Nº EPC pequeño',     tipo:'libre'},
+  texto1:   {n:'Texto libre 1',      tipo:'libre', editable:1},
+  texto2:   {n:'Texto libre 2',      tipo:'libre', editable:1},
+  recuadro: {n:'Recuadro',           tipo:'caja'},
+};
+const DIS_ELEM_DESC = {
+  sku:      {n:'Referencia (arriba)',   tipo:'bloque'},
+  nombre:   {n:'Descripción (grande)',  tipo:'bloque'},
+  oem:      {n:'Línea OEM',             tipo:'bloque'},
+  precio:   {n:'Precio ($)',            tipo:'libre'},
+  ubicacion:{n:'Bodega (U:)',           tipo:'libre'},
+  web:      {n:'Franja web (abajo)',    tipo:'bloque'},
+  codigo:   {n:'Código de barras',      tipo:'codigo'},
+  texto1:   {n:'Texto libre 1',         tipo:'libre', editable:1},
+  texto2:   {n:'Texto libre 2',         tipo:'libre', editable:1},
+  recuadro: {n:'Recuadro',              tipo:'caja'},
+};
+const mapaElem = () => disTab === 'desc' ? DIS_ELEM_DESC : DIS_ELEM;
+/* medidas de la etiqueta activa (la de descripción usa la config de la SAT) */
+function etqDims(){
+  return disTab === 'desc'
+    ? {an: +cfgEtq.sat_ancho_mm || 50, al: +cfgEtq.sat_alto_mm || 40, dpi: +cfgEtq.sat_dpi || 203}
+    : {an: +cfgEtq.etiqueta_ancho_mm, al: +cfgEtq.etiqueta_alto_mm, dpi: +cfgEtq.dpi};
+}
+const fmtPrecio = v => '$' + Number(v || 0).toLocaleString('es-CO');
+/* elementos agregados por el usuario: texto3+, raya3+, caja1+ */
+function elemMeta(k){
+  const M = mapaElem();
+  if(M[k]) return M[k];
+  if(k.startsWith('texto')) return {n:'Texto ' + k.slice(5), tipo:'libre', editable:1, extra:1};
+  if(k.startsWith('raya'))  return {n:'Línea ' + k.slice(4), tipo:'raya', extra:1};
+  if(k.startsWith('caja'))  return {n:'Recuadro ' + k.slice(4), tipo:'caja', extra:1};
+  return null;
+}
+function clavesDiseno(){
+  const M = mapaElem();
+  const base = Object.keys(M).filter(k => diseno[k]);
+  const extra = Object.keys(diseno).filter(k => !M[k] && k !== 'borde' && elemMeta(k));
+  return base.concat(extra);
+}
+function tabDiseno(t){
+  if(t === disTab) return;
+  disTab = t;
+  disSel = null;
+  if(disenos) diseno = disenos[t];
+  if(bgUrl){ URL.revokeObjectURL(bgUrl); bgUrl = null; }
+  const a = document.getElementById('tab-dis-cb'), b = document.getElementById('tab-dis-desc');
+  if(a) a.classList.toggle('prim', t === 'cb');
+  if(b) b.classList.toggle('prim', t === 'desc');
+  if(diseno){ construirPanelDiseno(); dibujarEtiqueta(); }
+  bmsg(t === 'desc' ? 'Etiqueta de DESCRIPCIÓN — sale por la impresora SAT'
+                    : 'Etiqueta de CÓDIGO DE BARRAS — sale por la Zebra (con chip)');
+}
+function agregarElem(tipo){
+  guardaUndo(1);
+  let n = 1; while(diseno[tipo + n]) n++;
+  const k = tipo + n;
+  diseno[k] = tipo === 'texto' ? {on:true, x:10, y:45, s:30, texto:'NUEVO TEXTO'}
+            : tipo === 'raya'  ? {on:true, x:10, y:50, ancho:60}
+            :                    {on:true, x:30, y:30, ancho:40, alto:25, grosor:2};
+  disSel = k;
+  construirPanelDiseno();
+  dibujarEtiqueta();
+}
+function eliminarElem(k){
+  guardaUndo(1);
+  delete diseno[k];
+  if(disSel === k) disSel = null;
+  construirPanelDiseno();
+  dibujarEtiqueta();
+}
+
+/* --- deshacer (una pila por pestaña) --- */
+let pilaUndo = {cb: [], desc: []}, tUndo = 0;
+function guardaUndo(forzar){
+  if(!diseno) return;
+  const ahora = Date.now();
+  if(!forzar && ahora - tUndo < 700) return;
+  tUndo = ahora;
+  const pila = pilaUndo[disTab];
+  pila.push(JSON.stringify(diseno));
+  if(pila.length > 80) pila.shift();
+}
+function deshacer(){
+  const pila = pilaUndo[disTab];
+  if(!pila.length){ toast('No hay nada que deshacer'); return; }
+  diseno = disenos[disTab] = JSON.parse(pila.pop());
+  construirPanelDiseno(); dibujarEtiqueta();
+}
+function zoomDis(dir){
+  disZoom = Math.min(3, Math.max(0.5, disZoom + dir * 0.25));
+  dibujarEtiqueta(true);   // el fondo real se escala solo, no hay que re-renderizar
+  bmsg('Zoom ' + Math.round(disZoom * 100) + '%');
+}
+
+/* --- FONDO = render REAL: la etiqueta que editas ES la impresión --- */
+let bgUrl = null, bgPendiente = false, bgCargando = false, bgReintentar = false, bgTimer = 0;
+function skuActual(){ const i = document.getElementById('dis-sku'); return i ? i.value.trim() : ''; }
+function chip(v){
+  const c = document.getElementById('dis-cargando');
+  if(c) c.style.display = v ? 'block' : 'none';
+}
+function programarFondo(){
+  bgPendiente = true;
+  chip(true);
+  clearTimeout(bgTimer);
+  bgTimer = setTimeout(refrescarFondo, 430);
+}
+async function refrescarFondo(){
+  if(!diseno || vista !== 'diseno') return;
+  if(bgCargando){ bgReintentar = true; return; }
+  bgCargando = true;
+  let logrado = false;
+  const tabPedida = disTab;   // si cambian de pestaña mientras carga, se descarta
+  try{
+    const r = await fetch(disTab === 'desc' ? '/api/etiqueta/preview_desc'
+                                            : '/api/etiqueta/preview', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({diseno, sku: skuActual()})});
+    if(tabPedida !== disTab){
+      bgCargando = false;
+      if(bgReintentar){ bgReintentar = false; refrescarFondo(); }else chip(false);
+      return;
+    }
+    if(r.ok){
+      const blob = await r.blob();
+      if(bgUrl) URL.revokeObjectURL(bgUrl);
+      bgUrl = URL.createObjectURL(blob);
+      bgPendiente = false;
+      logrado = true;
+    }
+  }catch(e){ /* sin internet: se pasa a la vista aproximada, editable igual */ }
+  bgCargando = false;
+  if(bgReintentar){ bgReintentar = false; refrescarFondo(); return; }
+  chip(false);
+  if(!logrado && bgUrl){
+    // no se pudo renderizar: modo sin internet con la vista aproximada
+    URL.revokeObjectURL(bgUrl); bgUrl = null;
+  }
+  // con render nuevo o sin él, se redibuja para limpiar fantasmas de arrastre
+  if(vista === 'diseno') dibujarEtiqueta(true);
+}
+
+function productoMuestra(){
+  const sku = document.getElementById('dis-sku').value.trim().toLowerCase();
+  return (sku && productos.find(p => p.sku.toLowerCase() === sku))
+      || productos.find(p => p.id === selId)
+      || productos.find(p => p.codigo_barras)
+      || productos[0]
+      || {sku:'EJEMPLO-01', nombre:'PRODUCTO DE EJEMPLO', oem:'032905106B F000ZS0210',
+          ubicacion:'BODEGA 1', codigo_barras:'300026000270', precio:27000};
+}
+
+/* Explorador del PC SERVIDOR: sirve para elegir una CARPETA (la de fotos, la
+   de copias) o un ARCHIVO de imagen (la foto de un producto). Funciona igual
+   desde CUALQUIER PC porque todo va por la red — se navegan las carpetas del
+   servidor porque es él quien abre esas fotos, no el PC donde estás. */
+function elegirCarpeta(idCampo){ explorarServidor(idCampo, false); }
+function elegirArchivoFoto(idCampo, alElegir){ explorarServidor(idCampo, true, alElegir); }
+
+async function explorarServidor(idCampo, modoArchivo, alElegir){
+  const campo = idCampo ? document.getElementById(idCampo) : null;
+  let actual = (campo ? campo.value : '').trim();
+  let elegido = '';
+  // si el campo ya trae un ARCHIVO, se abre en su carpeta y queda marcado
+  if(modoArchivo && /[\\/]/.test(actual) && /\.[a-z0-9]{2,5}$/i.test(actual)){
+    elegido = actual;
+    actual = actual.replace(/[\\/][^\\/]*$/, '');
+  }
+  // campo vacío: se abre directo en la CARPETA DE FOTOS configurada (no en la
+  // lista de discos) — así no hay que navegar hasta ella cada vez
+  if(!actual){
+    if(!cfgFotos){
+      try{ const c = await api('/api/config'); cfgFotos = (c && c.fotos_ruta) || ''; }catch(e){}
+    }
+    if(cfgFotos) actual = cfgFotos;
+  }
+  const ov = modal(modoArchivo ? '🖼 Elegir foto' : '📂 Elegir carpeta',
+    `<div id="ec-equipo" class="hint" style="margin-bottom:6px"></div>
+     <div style="display:flex;gap:6px;margin-bottom:6px">
+       <button class="btn" type="button" id="ec-arriba">⬆ Subir</button>
+       ${cfgFotos ? `<button class="btn" type="button" id="ec-fotos"
+              title="Ir a la carpeta de fotos configurada (${esc(cfgFotos)})">📷 Fotos</button>` : ''}
+       <input id="ec-ruta" style="flex:1" placeholder="Escribe o pega una ruta (\\\\SERVIDOR\\carpeta)">
+       <button class="btn" type="button" id="ec-ir">Ir</button>
+     </div>
+     ${modoArchivo ? `<input id="ec-filtro" placeholder="🔍 filtrar por nombre (ej. la referencia)"
+                             style="width:100%;margin-bottom:6px">` : ''}
+     <div id="ec-aviso" class="hint" style="min-height:16px"></div>
+     <div style="display:flex;gap:8px">
+       <div id="ec-lista" style="flex:1;height:290px;overflow:auto;border:1px solid #E1DFDD;
+            border-radius:3px;background:#fff"></div>
+       ${modoArchivo ? `<div id="ec-vista" style="width:190px;height:290px;border:1px solid #E1DFDD;
+            border-radius:3px;background:#FAF9F8;display:flex;align-items:center;
+            justify-content:center;padding:6px;text-align:center;color:#8A8886;
+            font-size:12px">Toca una imagen<br>para verla</div>` : ''}
+     </div>`,
+    [{t: modoArchivo ? '✔ Usar esta foto' : '✔ Usar esta carpeta', p:true, f: (o) => {
+        const valor = modoArchivo ? elegido : (o.querySelector('#ec-ruta').value || '').trim();
+        if(modoArchivo && !valor){ toast('Toca primero una imagen de la lista'); return; }
+        ponerValor(campo, valor);
+        o.remove();
+        if(alElegir) alElegir(valor);
+      }},
+     {t:'Cancelar'}]);
+  const lista = ov.querySelector('#ec-lista');
+  const inRuta = ov.querySelector('#ec-ruta');
+  const aviso = ov.querySelector('#ec-aviso');
+  const vista = ov.querySelector('#ec-vista');
+  const filtro = ov.querySelector('#ec-filtro');
+  let datos = {carpetas: [], archivos: []};
+
+  function marcar(ruta){
+    elegido = ruta;
+    if(vista) vista.innerHTML =
+      `<img src="/api/vista_archivo?ruta=${encodeURIComponent(ruta)}"
+            style="max-width:100%;max-height:250px;object-fit:contain"
+            onerror="this.parentNode.textContent='No se pudo mostrar'">`;
+    lista.querySelectorAll('.ec-ar').forEach(x =>
+      x.style.background = (x.dataset.ruta === ruta) ? '#FDE7D2' : '');
+  }
+  function pintarLista(){
+    const archs = datos.archivos;
+    const html = datos.carpetas.map((c, i) =>
+        `<div class="ec-it" data-i="${i}" style="padding:7px 10px;cursor:pointer;
+              border-bottom:1px solid #F3F2F1">${esc(c.nombre)}</div>`).join('')
+      + archs.map(a =>
+        `<div class="ec-ar" data-ruta="${esc(a.ruta)}" style="padding:7px 10px;cursor:pointer;
+              border-bottom:1px solid #F3F2F1">🖼 ${esc(a.nombre)}</div>`).join('');
+    lista.innerHTML = html || '<div class="hint" style="padding:10px">(nada que mostrar aquí)</div>';
+    lista.querySelectorAll('.ec-it').forEach(el => {
+      el.onmouseenter = () => el.style.background = '#F3F2F1';
+      el.onmouseleave = () => el.style.background = '';
+      el.onclick = () => ver(datos.carpetas[+el.dataset.i].ruta);
+    });
+    lista.querySelectorAll('.ec-ar').forEach(el => {
+      el.onclick = () => marcar(el.dataset.ruta);
+      el.ondblclick = () => { marcar(el.dataset.ruta); ov.querySelector('.m-pie .prim').click(); };
+    });
+    if(elegido) marcar(elegido);
+  }
+
+  async function ver(ruta, q){
+    lista.innerHTML = '<div class="hint" style="padding:10px">Abriendo…</div>';
+    let j;
+    try{
+      j = await api('/api/carpetas?ruta=' + encodeURIComponent(ruta || '')
+                    + (modoArchivo ? '&archivos=1' : '')
+                    + (q ? '&q=' + encodeURIComponent(q) : ''));
+    }catch(e){
+      aviso.innerHTML = '<span style="color:#A4262C">✖ ' + esc(e.message) + '</span>';
+      lista.innerHTML = '<div class="hint" style="padding:10px">No se pudo abrir. Prueba con ⬆ Subir.</div>';
+      return;
+    }
+    actual = j.ruta || '';
+    inRuta.value = actual;
+    datos = {carpetas: j.carpetas || [], archivos: j.archivos || []};
+    ov.querySelector('#ec-equipo').textContent =
+      'Archivos del PC servidor (' + (j.equipo || '?') + ')';
+    ov.querySelector('#ec-arriba').onclick = () => ver(j.raiz ? '' : (j.padre || ''));
+    ov.querySelector('#ec-arriba').disabled = !!j.raiz;
+    aviso.innerHTML = j.raiz
+      ? 'Elige la unidad, o pega arriba una ruta de red y toca «Ir».'
+      : (j.imagenes ? '🖼 <b>' + j.imagenes + '</b> imágenes en esta carpeta'
+          + (q ? ' · mostrando las que contienen «' + esc(q) + '»' : '')
+          + (j.truncado ? ' · <b>son muchas</b>: escribe la referencia arriba para encontrarla' : '')
+        : 'Sin imágenes sueltas aquí (puede que estén en una subcarpeta)');
+    pintarLista();
+  }
+  ov.querySelector('#ec-ir').onclick = () => ver(inRuta.value.trim());
+  const btnFotos = ov.querySelector('#ec-fotos');
+  if(btnFotos) btnFotos.onclick = () => { if(filtro) filtro.value = ''; ver(cfgFotos); };
+  inRuta.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); ver(inRuta.value.trim()); } });
+  // el filtro lo resuelve el SERVIDOR: en carpetas con miles de fotos, ninguna
+  // se queda fuera de la búsqueda por el tope de la lista
+  let filtT;
+  if(filtro) filtro.addEventListener('input', () => {
+    clearTimeout(filtT);
+    filtT = setTimeout(() => ver(actual, filtro.value.trim()), 280);
+  });
+  ver(actual);
+}
+
+/* Códigos de barras que ya no coinciden con el precio/proveedor de hoy
+   (pasa si al producto se le asignó el proveedor DESPUÉS de generar el
+   código: el impreso en la etiqueta y el guardado dejan de ser el mismo). */
+async function revisarCodigos(){
+  let j;
+  try{ j = await api('/api/productos/revisar_codigos', {}); }
+  catch(e){ return toast('No se pudo revisar: ' + e.message); }
+  if(!j.total)
+    return modal('Revisar códigos de barras',
+      '<p>✔ Todos los códigos de barras están correctos: coinciden con el precio y el proveedor actual de cada producto.</p>',
+      [{t:'Cerrar'}]);
+  const filas = j.productos.map(p => `<tr>
+      <td>${esc(p.sku)}</td><td>${esc(p.nombre)}</td>
+      <td style="color:#A4262C">${esc(p.antes)}</td>
+      <td style="color:#107C10;font-weight:600">${esc(p.ahora)}</td></tr>`).join('');
+  modal(`Revisar códigos de barras — ${j.total} desfasado(s)`,
+    `<p>Estos productos tienen guardado un código de barras que <b>ya no corresponde</b>
+      a su precio o proveedor actual (por eso al buscarlos por el número impreso no aparecen).</p>
+     <div style="max-height:320px;overflow:auto;border:1px solid #E1DFDD;border-radius:3px">
+       <table style="width:100%;border-collapse:collapse;font-size:12px">
+         <thead><tr style="background:#F3F2F1;position:sticky;top:0">
+           <th style="text-align:left;padding:5px">Código</th>
+           <th style="text-align:left;padding:5px">Nombre</th>
+           <th style="text-align:left;padding:5px">Guardado (viejo)</th>
+           <th style="text-align:left;padding:5px">Correcto</th></tr></thead>
+         <tbody>${filas}</tbody></table></div>
+     <p class="hint" style="margin-top:8px">Al corregirlos, las etiquetas que ya estén
+       pegadas con el código viejo dejarán de coincidir: conviene reimprimirlas.</p>`,
+    [{t:'Corregir todos', p:true, f: async (ov, btn) => {
+        btn.disabled = true; btn.textContent = 'Corrigiendo…';
+        try{
+          const r = await api('/api/productos/revisar_codigos', {aplicar:true});
+          ov.remove(); toast(`✔ ${r.total} código(s) corregido(s)`); cargarProductos();
+        }catch(e){ btn.disabled = false; btn.textContent = 'Corregir todos';
+          toast('Error: ' + e.message); }
+      }},
+     {t:'Cerrar'}]);
+}
+
+async function verDiseno(){
+  mostrarVista('diseno');
+  try{
+    if(!disenos){
+      const j = await api('/api/etiqueta/diseno');
+      disenos = {cb: j.actual, desc: j.desc_actual || {}};
+      origs = {cb: j.original, desc: j.desc_original || {}};
+      diseno = disenos[disTab];
+    }
+    if(!cfgEtq) cfgEtq = await api('/api/config');
+    if(!productos.length) await cargarProductos();
+  }catch(e){ toast('✖ ' + e.message); return; }
+  // el producto seleccionado en la tabla carga automático como muestra
+  const p = productos.find(x => x.id === selId);
+  const inp = document.getElementById('dis-sku');
+  if(p) inp.value = p.sku;
+  construirPanelDiseno();
+  dibujarEtiqueta();
+}
+
+const DIS_ICONO = {
+  oem:'🔡', raya1:'─', nombre:'🔠', raya2:'─', codigo:'▌║▌', foto:'📷', precio:'💲',
+  ubicacion:'📍', web:'🌐', epc:'🔖', texto1:'✏️', texto2:'✏️', recuadro:'▭', sku:'🔢'
+};
+function iconoDe(k){
+  return DIS_ICONO[k] || (k.startsWith('texto') ? '✏️' : k.startsWith('raya') ? '─' : '▭');
+}
+function construirPanelDiseno(){
+  const filas = clavesDiseno().map(k => `
+    <div class="dis-item ${diseno[k].on ? 'on' : ''} ${disSel === k ? 'sel' : ''}"
+         data-k="${k}" onclick="clicItemDis('${k}')">
+      <input type="checkbox" ${diseno[k].on ? 'checked' : ''}
+             onclick="event.stopPropagation()" onchange="toggleElemDis('${k}', this.checked)">
+      <span class="di-ic">${iconoDe(k)}</span><span>${elemMeta(k).n}</span>
+    </div>`).join('');
+  document.getElementById('dis-panel').innerHTML = `
+    <div class="dis-sec">${disTab === 'desc' ? 'ETIQUETA DE DESCRIPCIÓN (SAT)'
+                                             : 'ETIQUETA DE CÓDIGO (ZEBRA)'}</div>
+    ${disTab === 'desc' ? `<div class="hint" style="margin:0 0 6px">Sale por la impresora
+      SAT, sin chip. Su tamaño e IP se ajustan en ⚙ Configuración.</div>` : ''}
+    ${filas}
+    <div class="dis-item ${diseno.borde.on ? 'on' : ''}">
+      <input type="checkbox" ${diseno.borde.on ? 'checked' : ''}
+             onclick="event.stopPropagation()"
+             onchange="guardaUndo(1);diseno.borde.on=this.checked;dibujarEtiqueta()">
+      <span class="di-ic">⬜</span><span>Imprimir marco</span>
+    </div>
+    <div class="dis-sec">AGREGAR</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap">
+      <button class="btn mini" onclick="agregarElem('texto')">+ Texto</button>
+      <button class="btn mini" onclick="agregarElem('raya')">+ Línea</button>
+      <button class="btn mini" onclick="agregarElem('caja')">+ Recuadro</button>
+    </div>
+    <div class="dis-sec">PROPIEDADES</div>
+    <div id="dis-props">${htmlPropiedades()}</div>
+    <div class="dis-sec">AYUDA</div>
+    <div class="hint" style="line-height:1.8">
+      ✋ Arrastrar = mover<br>
+      🟧 Esquina = tamaño · lado derecho = estirar<br>
+      ⌨ Flechas = mover fino (Shift = rápido)<br>
+      Supr = quitar · Ctrl+Z = deshacer<br>
+      Lo redondeado es el troquel físico; no se imprime.
+    </div>`;
+}
+function toggleElemDis(k, on){
+  guardaUndo(1);
+  diseno[k].on = on;
+  if(on) disSel = k; else if(disSel === k) disSel = null;
+  dibujarEtiqueta();
+  construirPanelDiseno();
+}
+function clicItemDis(k){
+  if(!diseno[k].on) return;
+  seleccionarDis(k);
+}
+function htmlPropiedades(){
+  if(!disSel || !diseno[disSel] || !diseno[disSel].on)
+    return '<div class="hint">Toca un elemento de la etiqueta para ver y ajustar aquí sus medidas exactas.</div>';
+  const k = disSel, d = diseno[k], meta = elemMeta(k);
+  const num = (prop, nom, paso) => d[prop] === undefined ? '' : `
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">${nom}</span>
+      <input type="number" step="${paso || 0.5}" value="${Math.round(d[prop] * 10) / 10}"
+             style="width:72px;padding:3px 6px;border:1px solid #C8C6C4;border-radius:3px"
+             onchange="guardaUndo(1);diseno['${k}'].${prop}=+this.value;dibujarEtiqueta()">
+    </div>`;
+  let h = `<div style="font-weight:600;font-size:12px;color:#C25705">${meta.n}</div>`;
+  h += num('x', '↔ X (%)') + num('y', '↕ Y (%)');
+  if(d.ancho !== undefined) h += num('ancho', 'Ancho (%)');
+  if(d.alto !== undefined) h += num('alto', 'Alto (%)');
+  if(d.s !== undefined) h += num('s', 'Letra', 2);
+  if(d.grosor !== undefined) h += num('grosor', 'Grosor', 1);
+  if(d.s !== undefined && meta.tipo !== 'codigo') h += `
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">Fuente</span>
+      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+              onchange="guardaUndo(1);diseno['${k}'].fuente=this.value;dibujarEtiqueta();construirPanelDiseno()">
+        ${[['', disTab === 'desc' ? 'Arial Narrow negrita (automática)' : 'Impresora (original, negrita)'],
+           ['arialn','Arial Narrow (la original delgada)'],
+           ['arial','Arial'],['times','Times New Roman'],['verdana','Verdana'],
+           ['georgia','Georgia'],['segoe','Segoe UI'],['consolas','Consolas'],
+           ['courier','Courier'],['impact','Impact'],['ocr','OCR (máquina)']].map(([v, n]) =>
+          `<option value="${v}" ${(d.fuente || '') === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select></div>
+    ${d.fuente ? `
+    <div style="display:flex;gap:14px;margin-top:6px">
+      <label class="chk" style="margin:0;font-size:11.5px">
+        <input type="checkbox" ${d.negrita ? 'checked' : ''}
+               onchange="guardaUndo(1);diseno['${k}'].negrita=this.checked;dibujarEtiqueta()">
+        <b>Negrita</b></label>
+      <label class="chk" style="margin:0;font-size:11.5px">
+        <input type="checkbox" ${d.cursiva ? 'checked' : ''}
+               onchange="guardaUndo(1);diseno['${k}'].cursiva=this.checked;dibujarEtiqueta()">
+        <i>Cursiva</i></label>
+    </div>` : ''}
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">Estilo</span>
+      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+              onchange="guardaUndo(1);diseno['${k}'].letra=this.value;dibujarEtiqueta()">
+        ${[['','Normal'],['estrecha','Letra estrecha'],['ancha','Letra ancha']].map(([v, n]) =>
+          `<option value="${v}" ${(d.letra || '') === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select></div>
+    ${disTab === 'desc' ? `
+    <label class="chk" style="margin-top:7px;font-size:11.5px">
+      <input type="checkbox" ${d.inv ? 'checked' : ''}
+             onchange="guardaUndo(1);diseno['${k}'].inv=this.checked;dibujarEtiqueta()">
+      Franja negra (letras blancas)</label>` : ''}`;
+  if(k === 'codigo') h += `
+    <label class="chk" style="margin-top:7px;font-size:11.5px">
+      <input type="checkbox" ${d.numeros === false ? '' : 'checked'}
+             onchange="guardaUndo(1);diseno.codigo.numeros=this.checked;dibujarEtiqueta()">
+      Números debajo de las barras</label>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">Fuente nº</span>
+      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+              onchange="guardaUndo(1);diseno.codigo.fuente_num=this.value;dibujarEtiqueta()">
+        ${[['arial','Arial (limpia)'],['arialn','Arial delgada'],['arialbd','Arial negrita'],
+           ['consolas','Consolas (pareja)'],['ocr','OCR (máquina)'],['segoe','Segoe UI'],
+           ['0','Zebra original']].map(([v, n]) =>
+          `<option value="${v}" ${(d.fuente_num || 'arial') === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select></div>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">Tamaño nº</span>
+      <input type="number" step="2" min="0" max="120" value="${d.num_s || ''}" placeholder="auto"
+             style="width:72px;padding:3px 6px;border:1px solid #C8C6C4;border-radius:3px"
+             onchange="guardaUndo(1);diseno.codigo.num_s=Math.max(0,+this.value||0);dibujarEtiqueta()">
+      <span class="hint">vacío = auto</span></div>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">Barras</span>
+      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+              onchange="guardaUndo(1);diseno.codigo.barras=this.value;dibujarEtiqueta()">
+        ${[['fino','Finas'],['','Normales'],['grueso','Gruesas']].map(([v, n]) =>
+          `<option value="${v}" ${(d.barras || '') === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select></div>`;
+  if(k === 'nombre') h += `
+    <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
+      <span style="width:64px;flex:none;color:#5A5856">Líneas</span>
+      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px"
+              onchange="guardaUndo(1);diseno.nombre.lineas=+this.value;dibujarEtiqueta()">
+        ${[[0,'Automático'],[1,'1'],[2,'2'],[3,'3'],[4,'4']].map(([v, n]) =>
+          `<option value="${v}" ${(+d.lineas || 0) === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select></div>`;
+  if(d.alin !== undefined) h += `
+    <div style="display:flex;gap:4px;margin-top:7px;align-items:center">
+      ${[['L','⯇'],['C','☰'],['R','⯈']].map(([v, ic]) =>
+        `<button class="btn mini ${d.alin === v ? 'prim' : ''}" title="Alinear"
+           onclick="guardaUndo(1);diseno['${k}'].alin='${v}';dibujarEtiqueta();construirPanelDiseno()">${ic}</button>`).join('')}
+      <span class="hint">alinear texto</span></div>`;
+  if(k === 'foto'){
+    const pd = productoDiseno();
+    h += `
+    <div style="margin-top:8px;font-size:11.5px;color:#5A5856">Archivo de la foto de
+      <b>${esc(pd ? pd.sku : '¿?')}</b>:</div>
+    <div style="display:flex;gap:5px;margin-top:2px">
+      <input id="dis-foto-ruta" value="${esc(pd && pd.foto || '')}"
+             placeholder="se busca sola en la carpeta de fotos"
+             style="flex:1;min-width:0;padding:4px 7px;border:1px solid #C8C6C4;border-radius:3px;font-size:11px"
+             onchange="guardarFotoProducto(this.value.trim())">
+      <button class="btn mini" onclick="elegirFotoDiseno()" title="Buscar el archivo en el PC">📂</button>
+    </div>
+    <div class="hint">Si la foto no sale sola, elige aquí el archivo exacto para
+    este producto. Déjalo vacío para que se busque sola otra vez.</div>`;
+  }
+  if(meta.editable) h += `
+    <div style="margin-top:7px;font-size:11.5px;color:#5A5856">Texto que se imprime:</div>
+    <input value="${esc(d.texto || '')}" style="width:100%;padding:4px 7px;border:1px solid #C8C6C4;border-radius:3px;margin-top:2px"
+           onchange="guardaUndo(1);diseno['${k}'].texto=this.value;dibujarEtiqueta()">`;
+  h += `<div style="display:flex;gap:5px;margin-top:9px">
+    <button class="btn mini" onclick="centrarElemento('${k}')">Centrar ↔</button>
+    ${meta.extra ? `<button class="btn mini rojo" onclick="eliminarElem('${k}')">🗑 Eliminar</button>` : ''}
+  </div>`;
+  if(k === 'precio') h += `<div class="hint" style="margin-top:6px">Solo sale en productos que tengan precio.</div>`;
+  if(k === 'foto') h += `<div class="hint" style="margin-top:6px">Busca la imagen por la referencia
+    en la carpeta de fotos (⚙ Configuración). Si el producto no tiene foto, no imprime nada.</div>`;
+  return h;
+}
+function centrarElemento(k){
+  guardaUndo(1);
+  const d = diseno[k];
+  if(d.ancho !== undefined){ d.x = Math.max(0, (100 - d.ancho) / 2); }
+  else{
+    const etq = document.getElementById('dis-etq');
+    const el = document.querySelector(`#dis-etq [data-k="${k}"]`);
+    if(el && etq) d.x = Math.max(0, (100 - el.offsetWidth / etq.clientWidth * 100) / 2);
+  }
+  dibujarEtiqueta();
+  const pr = document.getElementById('dis-props');
+  if(pr) pr.innerHTML = htmlPropiedades();
+}
+
+/* --- dibujo EAN-13 real en canvas --- */
+function ean13Modulos(dato){
+  const L={0:'0001101',1:'0011001',2:'0010011',3:'0111101',4:'0100011',5:'0110001',
+           6:'0101111',7:'0111011',8:'0110111',9:'0001011'};
+  const G={0:'0100111',1:'0110011',2:'0011011',3:'0100001',4:'0011101',5:'0111001',
+           6:'0000101',7:'0010001',8:'0001001',9:'0010111'};
+  const PAR={0:'LLLLLL',1:'LLGLGG',2:'LLGGLG',3:'LLGGGL',4:'LGLLGG',5:'LGGLLG',
+             6:'LGGGLL',7:'LGLGLG',8:'LGLGGL',9:'LGGLGL'};
+  let d = dato.slice(0, 12).split('').map(Number);
+  let sum = d.reduce((a, n, i) => a + n * (i % 2 ? 3 : 1), 0);
+  d.push((10 - sum % 10) % 10);                       // dígito de control
+  let m = '101';
+  for(let i = 1; i <= 6; i++) m += (PAR[d[0]][i-1] === 'L' ? L : G)[d[i]];
+  m += '01010';
+  for(let i = 7; i <= 12; i++){
+    const r = L[d[i]].split('').map(b => b === '1' ? '0' : '1').join('');
+    m += r;
+  }
+  return m + '101';
+}
+function dibujarBarras(cv, dato, wPx, hPx, digPx, offPx){
+  /* estilo EAN clásico: barras arriba, números DEBAJO, primer dígito a la
+     izquierda (en el espacio offPx) y las guías bajan entre los números */
+  cv.width = Math.round(wPx); cv.height = Math.round(hPx);
+  const off = Math.round(offPx || 0);
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#000';
+  const esEan = /^\d{12,13}$/.test(dato);
+  const mods = esEan ? ean13Modulos(dato) : null;
+  const n = esEan ? 95 : 68;
+  const mw = (cv.width - off) / n;
+  const sinNums = digPx < 6;                          // "números debajo" apagado
+  const hDato = sinNums ? cv.height : Math.max(6, cv.height - digPx - 2);
+  const hGuia = Math.min(cv.height, hDato + digPx * 0.55);
+  for(let i = 0; i < n; i++){
+    let negro, guia = false;
+    if(esEan){
+      negro = mods[i] === '1';
+      guia = i < 3 || (i >= 45 && i < 50) || i >= 92;
+    }else{                                            // Code 128: barras ilustrativas
+      let hsh = 0;
+      for(const ch of dato) hsh = (hsh * 31 + ch.charCodeAt(0) + i * 7) & 1023;
+      negro = (i < 4 || i > n - 5) ? (i % 2 === 0) : (hsh % 5 < 2);
+    }
+    if(negro) g.fillRect(off + i * mw, 0, Math.max(1, mw * 0.92), guia ? hGuia : hDato);
+  }
+  if(sinNums) return;
+  const fnum = (diseno && diseno.codigo && diseno.codigo.fuente_num) || 'arial';
+  const MAPA_F = {arial:'Arial', arialn:'"Arial Narrow",Arial', arialbd:'Arial',
+                  consolas:'Consolas,monospace', ocr:'"OCR A Extended",Consolas,monospace',
+                  segoe:'"Segoe UI",Arial', 0:'"Arial Narrow",Arial'};
+  g.font = `${fnum === 'arialbd' || fnum === '0' ? '700 ' : ''}${digPx}px ${MAPA_F[fnum] || 'Arial'}`;
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  if(esEan){
+    const d = dato.slice(0, 12);   // grupos 6+6 centrados bajo cada mitad
+    g.fillText(d.slice(0, 6), off + mw * 24.5, hDato + 1);
+    g.fillText(d.slice(6, 12), off + mw * 70.5, hDato + 1);
+    if(off > 4) g.fillText(d[0], digPx / 2, hDato + 1);
+  }else{
+    g.fillText(dato, off + (cv.width - off) / 2, hDato + 1);
+  }
+}
+
+/* --- OEM en la etiqueta: solo dos referencias, separadas por ESPACIOS
+       (una referencia puede traer / . - adentro y esas tienen prioridad) --- */
+function oemEtiqueta(oem){
+  const refs = String(oem).split(/\s+/)
+    .map(t => t.replace(/^[,;]+|[,;]+$/g, '')).filter(Boolean);
+  if(refs.length <= 2) return refs.join(' ');
+  const idx = [];
+  refs.forEach((r, i) => { if(idx.length < 2 && /[^0-9A-Za-z]/.test(r)) idx.push(i); });
+  for(let i = 0; i < refs.length && idx.length < 2; i++)
+    if(!idx.includes(i)) idx.push(i);
+  return idx.sort((a, b) => a - b).map(i => refs[i]).join(' ');
+}
+
+/* --- fuentes de texto: '' = fuente de la impresora (^A0, se aproxima con
+       Arial Narrow negrita); las demás son fuentes reales de Windows --- */
+const FUENTE_CSS = {
+  '':        '"Arial Narrow","Helvetica Condensed",Arial,sans-serif',
+  arial:     'Arial,sans-serif',
+  arialn:    '"Arial Narrow",Arial,sans-serif',
+  times:     '"Times New Roman",serif',
+  verdana:   'Verdana,sans-serif',
+  georgia:   'Georgia,serif',
+  segoe:     '"Segoe UI",sans-serif',
+  consolas:  'Consolas,monospace',
+  courier:   '"Courier New",monospace',
+  impact:    'Impact,sans-serif',
+  ocr:       '"OCR A Extended",Consolas,monospace'
+};
+function fuenteCss(d){
+  const fam = FUENTE_CSS[d.fuente || ''] || FUENTE_CSS[''];
+  const peso = d.fuente ? (d.negrita ? 700 : 400) : 700;
+  const estilo = (d.fuente && d.cursiva) ? 'italic ' : '';
+  return {fam, peso, estilo};
+}
+
+/* --- medidas exactas: mismas cuentas que hace la impresión, para que el
+       recuadro de selección abarque JUSTO lo que se ve --- */
+let _medidor = null;
+function medirTexto(texto, fpx, fac, d){
+  if(!_medidor) _medidor = document.createElement('canvas').getContext('2d');
+  const f = fuenteCss(d || {});
+  _medidor.font = `${f.estilo}${f.peso} ${fpx}px ${f.fam}`;
+  return _medidor.measureText(String(texto)).width * (fac || 1);
+}
+function lineasNecesarias(texto, fpx, fac, anchoPx, maxLin, d){
+  const esp = medirTexto(' ', fpx, fac, d);
+  let lin = 1, w = 0;
+  for(const pal of String(texto).split(/\s+/).filter(Boolean)){
+    const pw = medirTexto(pal, fpx, fac, d);
+    if(w > 0 && w + esp + pw > anchoPx){ lin++; w = pw; }
+    else w += (w ? esp : 0) + pw;
+  }
+  return Math.max(1, Math.min(maxLin, lin));
+}
+function geomCodigo(d, dato, wd, hd, ft, esc){
+  /* caja real del código: barras + números debajo + primer dígito del EAN
+     a la izquierda (mismas fórmulas que el servidor) */
+  const esEan = /^\d{12,13}$/.test(dato);
+  const ajuste = {fino:-1, grueso:1}[d.barras] || 0;
+  const mod = esEan ? Math.max(2, Math.min(7, Math.floor(wd * 0.5 / 95) + ajuste))
+                    : Math.max(2, Math.min(6, (wd < 700 ? 2 : 3) + ajuste));
+  const conNums = d.numeros !== false;
+  const dig = conNums ? Math.max(12, ((+d.num_s || 0) > 0 ? +d.num_s : d.alto * 1.5) * ft) : 0;
+  const altoBc = Math.max(30, d.alto / 100 * hd);
+  const offPx = (esEan && conNums ? dig + mod : 0) * esc;
+  const anchoPx = (esEan ? 95 : 11 * String(dato).length + 35) * mod * esc + offPx;
+  const altoPx = (altoBc + (conNums ? 2 + dig : 0)) * esc;
+  return {esEan, mod, digPx: dig * esc, offPx, anchoPx, altoPx};
+}
+
+/* --- construir la etiqueta editable --- */
+function dibujarEtiqueta(desdeRender){
+  const lienzo = document.getElementById('dis-lienzo');
+  if(!cfgEtq || !diseno) return;
+  if(!desdeRender) bgPendiente = true;   // cambió el diseño: hay que re-renderizar
+  const p = productoMuestra();
+  const dm = etqDims();                               // etiqueta activa (Zebra o SAT)
+  const dpi = dm.dpi;
+  const wd = dm.an / 25.4 * dpi;                      // puntos de impresora
+  const hd = dm.al / 25.4 * dpi;
+  const ft = Math.min(wd / 1181, hd / 590);
+  const esc = Math.min((lienzo.clientWidth - 90) / wd, (lienzo.clientHeight - 90) / hd) * disZoom;
+  const W = wd * esc, H = hd * esc;
+  const rad = 3 / 25.4 * dpi * esc;                   // esquinas troqueladas ~3 mm
+  lienzo.innerHTML = `<div id="dis-etq" style="position:relative;flex:none;margin:auto;
+    width:${W}px;height:${H}px;background:#fff;border-radius:${rad}px;
+    box-shadow:0 6px 26px rgba(0,0,0,.35)">
+    <div id="dis-cargando">actualizando…</div>
+    <div id="dis-guia" style="position:absolute;left:50%;top:0;bottom:0;width:0;
+      border-left:1.5px dashed #E87722;display:none;pointer-events:none;z-index:4"></div></div>`;
+  const etq = document.getElementById('dis-etq');
+  etq.onpointerdown = e => { if(e.target === etq) seleccionarDis(null); };
+  const F = v => Math.max(14, v * ft) * esc;          // tamaño fuente en px
+  const alinCss = {L:'left', C:'center', R:'right'};
+
+  if(diseno.borde.on){
+    const b = document.createElement('div');
+    b.style.cssText = `position:absolute;inset:${2*esc}px;border:${Math.max(1,2*esc)}px solid #000;
+      border-radius:${rad*0.9}px;pointer-events:none`;
+    etq.appendChild(b);
+  }
+  const textoPlano = k =>
+    // en la etiqueta solo caben dos referencias OEM (misma regla del servidor)
+    k === 'oem'       ? 'OEM ' + oemEtiqueta(p.oem || '032905106B') :
+    k === 'sku'       ? String(p.sku || '') :
+    k === 'nombre'    ? String(p.nombre || '').slice(0, disTab === 'desc' ? 120 : 64).toUpperCase() :
+    k === 'web'       ? (cfgEtq.nombre_empresa || '') :
+    k === 'ubicacion' ? 'U: ' + (p.ubicacion || 'BODEGA 1') :
+    k === 'precio'    ? fmtPrecio(p.precio || 27000) :
+    k === 'epc'       ? EPC_MUESTRA :
+    String(diseno[k].texto || '');
+  const contenido = k => k === 'epc' ? EPC_MUESTRA : esc2(textoPlano(k));
+
+  const letraCss = d => {
+    const fac = {estrecha:0.72, ancha:1.35}[d.letra] || 1;
+    return fac === 1 ? '' : `transform:scaleX(${fac});transform-origin:center top;`;
+  };
+  for(const k of clavesDiseno()){
+    const d = diseno[k];
+    if(!d || !d.on) continue;
+    const t = elemMeta(k).tipo;
+    const el = document.createElement('div');
+    el.dataset.k = k;
+    let css = `position:absolute;cursor:move;user-select:none;left:${d.x}%;top:${d.y}%;`;
+    if(t === 'bloque'){
+      const fpx = F(d.s);
+      const fac = {estrecha:0.72, ancha:1.35}[d.letra] || 1;
+      const fu = fuenteCss(d);
+      // alto real impreso: nº de líneas usadas × letra + 4 puntos entre líneas
+      let lin = 1;
+      if(k === 'nombre'){
+        const maxLin = (+d.lineas || 0) > 0 ? +d.lineas : 4;
+        lin = lineasNecesarias(textoPlano(k), fpx, fac, d.ancho / 100 * W, maxLin, d);
+      }
+      // inv = franja negra con letras blancas (pie de la etiqueta de descripción)
+      const padI = d.inv ? Math.round(fpx * 0.3) : 0;
+      css += `width:${d.ancho}%;height:${lin * fpx + (lin - 1) * 4 * esc + 2 * padI}px;`;
+      const fcss = `font:${fu.estilo}${fu.peso} ${fpx}px ${fu.fam};line-height:${fpx + 4 * esc}px;text-align:${alinCss[d.alin || 'C']};${letraCss(d)}`
+        + (d.inv ? `background:#000;color:#fff;padding:${padI}px 0;` : '');
+      if(k === 'nombre'){
+        const clamp = (+d.lineas || 0) > 0
+          ? `display:-webkit-box;-webkit-line-clamp:${+d.lineas};-webkit-box-orient:vertical;overflow:hidden;` : '';
+        el.innerHTML = `<div class="di-cont" style="${fcss}text-transform:uppercase;${clamp}">${contenido(k)}</div>`;
+      }else{
+        el.innerHTML = `<div class="di-cont" style="${fcss}white-space:nowrap">${contenido(k)}</div>`;
+      }
+    }else if(t === 'raya'){
+      css += `width:${d.ancho}%;height:${Math.max(2, 2*esc)}px;`;
+      el.innerHTML = `<div class="di-cont" style="width:100%;height:100%;background:#000"></div>`;
+    }else if(t === 'caja'){
+      css += `width:${d.ancho}%;height:${d.alto}%;`;
+      el.innerHTML = k === 'foto'
+        ? `<div class="di-cont" style="width:100%;height:100%;border:1.5px dashed #B5B2AF;
+             display:flex;align-items:center;justify-content:center;font-size:24px;color:#B5B2AF">📷</div>`
+        : `<div class="di-cont" style="width:100%;height:100%;border:${Math.max(1, (d.grosor || 2) * esc)}px solid #000"></div>`;
+    }else if(t === 'codigo'){
+      const cb = (p.codigo_barras || '').trim();
+      const dato = /^\d{12,13}$/.test(cb) ? cb : String(p.sku);
+      const gm = geomCodigo(d, dato, wd, hd, ft, esc);
+      // margin-left negativo: el recuadro abarca el primer dígito del EAN
+      // sin mover el punto de anclaje (x sigue siendo el inicio de las barras)
+      css += `width:${gm.anchoPx}px;height:${gm.altoPx}px;margin-left:${-gm.offPx}px;`;
+      el.dataset.dato = dato;
+      el.innerHTML = '<div class="di-cont" style="width:100%;height:100%"><canvas style="width:100%;height:100%"></canvas></div>';
+      el.style.cssText = css;
+      etq.appendChild(el);
+      dibujarBarras(el.querySelector('canvas'), dato, gm.anchoPx, gm.altoPx, gm.digPx, gm.offPx);
+      activarElemento(el, k, esc, wd, hd, ft);
+      continue;
+    }else{                                            // texto libre
+      const min = k === 'epc' ? 10 : 14;
+      const fpx = Math.max(min, d.s * ft) * esc;
+      const fac = {estrecha:0.72, ancha:1.35}[d.letra] || 1;
+      const fu = fuenteCss(d);
+      const padL = d.inv ? Math.round(fpx * 0.3) : 0;
+      css += `width:${Math.max(14, medirTexto(textoPlano(k), fpx, fac, d) + 2 * padL)}px;height:${fpx + 2 * padL}px;`;
+      el.innerHTML = `<div class="di-cont" style="font:${fu.estilo}${fu.peso} ${fpx}px ${fu.fam};white-space:nowrap;${letraCss(d).replace('center top', 'left top')}${d.inv ? `background:#000;color:#fff;padding:${padL}px` : ''}">${contenido(k)}</div>`;
+    }
+    el.style.cssText = css;
+    etq.appendChild(el);
+    activarElemento(el, k, esc, wd, hd, ft);
+  }
+  if(bgUrl){
+    etq.classList.add('con-img');
+    const img = document.createElement('img');
+    img.className = 'real-img'; img.src = bgUrl;
+    etq.appendChild(img);
+  }
+  if(disSel && diseno[disSel] && diseno[disSel].on) seleccionarDis(disSel, true);
+  if(!desdeRender) programarFondo();
+}
+const esc2 = esc;   // alias: esc() de utilidades escapa HTML; esc local es la escala
+
+/* --- selección, arrastre y cambio de tamaño con el mouse --- */
+function seleccionarDis(k, silencioso){
+  disSel = k;
+  document.querySelectorAll('#dis-etq [data-k]').forEach(el => {
+    const sel = el.dataset.k === k;
+    el.style.outline = sel ? '1.5px dashed #E87722' : '';
+    el.style.outlineOffset = '2px';
+    el.querySelectorAll('.agarre').forEach(x => x.remove());
+    if(sel){
+      const t = elemMeta(k).tipo;
+      const gs = t === 'bloque' ? ['e','se'] : t === 'raya' ? ['e']
+               : t === 'caja' ? ['e','s','se'] : ['se'];
+      for(const g of gs){
+        const h = document.createElement('div');
+        h.className = 'agarre'; h.dataset.g = g;
+        const pos = g === 'e' ? 'right:-7px;top:50%;margin-top:-7px;cursor:ew-resize'
+                  : g === 's' ? 'bottom:-7px;left:50%;margin-left:-7px;cursor:ns-resize'
+                  : 'right:-7px;bottom:-7px;cursor:nwse-resize';
+        h.style.cssText = `position:absolute;${pos};width:13px;height:13px;
+          background:#E87722;border:2px solid #fff;border-radius:3px;z-index:5`;
+        el.appendChild(h);
+      }
+    }
+  });
+  const pr = document.getElementById('dis-props');
+  if(pr) pr.innerHTML = htmlPropiedades();
+  document.querySelectorAll('#dis-panel .dis-item[data-k]').forEach(it =>
+    it.classList.toggle('sel', it.dataset.k === k));
+  if(k && !silencioso) bmsg('Elemento: ' + elemMeta(k).n);
+}
+function aplicarVivo(el, k, esc, wd, hd, ft){
+  /* refleja diseno[k] en el elemento SIN reconstruir la etiqueta (para que
+     el arrastre no se corte); al soltar se redibuja completa */
+  const d = diseno[k];
+  const t = elemMeta(k).tipo;
+  el.style.left = d.x + '%';
+  el.style.top = d.y + '%';
+  if(t === 'codigo'){
+    const gm = geomCodigo(d, el.dataset.dato, wd, hd, ft, esc);
+    el.style.width = gm.anchoPx + 'px';
+    el.style.height = gm.altoPx + 'px';
+    el.style.marginLeft = -gm.offPx + 'px';
+    dibujarBarras(el.querySelector('canvas'), el.dataset.dato,
+                  gm.anchoPx, gm.altoPx, gm.digPx, gm.offPx);
+  }else if(t === 'raya'){
+    el.style.width = d.ancho + '%';
+  }else if(t === 'caja'){
+    el.style.width = d.ancho + '%';
+    el.style.height = d.alto + '%';
+  }else if(t === 'bloque'){
+    el.style.width = d.ancho + '%';
+    const c = el.querySelector('.di-cont'); if(c) c.style.fontSize = Math.max(14, d.s * ft) * esc + 'px';
+  }else if(d.s){
+    const min = k === 'epc' ? 10 : 14;
+    const c = el.querySelector('.di-cont'); if(c) c.style.fontSize = Math.max(min, d.s * ft) * esc + 'px';
+  }
+}
+function activarElemento(el, k, esc, wd, hd, ft){
+  el.addEventListener('pointerdown', ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    seleccionarDis(k);
+    guardaUndo(1);
+    const etq = document.getElementById('dis-etq');
+    const W = etq.clientWidth, H = etq.clientHeight;
+    const d = diseno[k];
+    const g = ev.target.classList.contains('agarre') ? ev.target.dataset.g : null;
+    const x0 = ev.clientX, y0 = ev.clientY;
+    const inicio = {x:d.x||0, y:d.y||0, s:d.s||0, alto:d.alto||0, ancho:d.ancho||0};
+    // FANTASMA: se recorta el trozo del render REAL y ese recorte es lo que se
+    // mueve/escala con el mouse — nunca cambia de aspecto durante el arrastre
+    let ghost = null, parche = null, gL = 0, gT = 0;
+    if(bgUrl){
+      const r = el.getBoundingClientRect(), re = etq.getBoundingClientRect();
+      const L = gL = r.left - re.left, T = gT = r.top - re.top;
+      parche = document.createElement('div');
+      parche.style.cssText = `position:absolute;left:${L}px;top:${T}px;width:${r.width}px;
+        height:${r.height}px;background:#fff;z-index:2;pointer-events:none`;
+      ghost = document.createElement('div');
+      ghost.style.cssText = `position:absolute;left:${L}px;top:${T}px;width:${r.width}px;
+        height:${r.height}px;z-index:3;pointer-events:none;background-image:url(${bgUrl});
+        background-size:${W}px ${H}px;background-position:${-L}px ${-T}px;
+        outline:1.5px dashed #E87722;transform-origin:top left`;
+      etq.appendChild(parche); etq.appendChild(ghost);
+    }
+    el.setPointerCapture(ev.pointerId);
+    el.onpointermove = e2 => {
+      const dx = (e2.clientX - x0) / W * 100, dy = (e2.clientY - y0) / H * 100;
+      if(g === 'e'){
+        d.ancho = Math.min(100 - d.x, Math.max(5, inicio.ancho + dx));
+      }else if(g === 's'){
+        d.alto = Math.min(90, Math.max(3, inicio.alto + dy));
+      }else if(g === 'se'){
+        if(elemMeta(k).tipo === 'codigo') d.alto = Math.min(65, Math.max(8, inicio.alto + dy));
+        else if(elemMeta(k).tipo === 'caja'){
+          d.ancho = Math.min(100 - d.x, Math.max(5, inicio.ancho + dx));
+          d.alto = Math.min(90, Math.max(3, inicio.alto + dy));
+        }
+        else if(d.s) d.s = Math.min(240, Math.max(14, inicio.s + dy * hd / 100 / ft));
+      }else{
+        d.x = Math.min(97, Math.max(0, inicio.x + dx));
+        d.y = Math.min(97, Math.max(0, inicio.y + dy));
+        // guía imantada: al pasar por el centro, el elemento se centra solo
+        const guia = document.getElementById('dis-guia');
+        if(d.ancho !== undefined){
+          const centro = d.x + d.ancho / 2;
+          if(Math.abs(centro - 50) < 1.3){ d.x = 50 - d.ancho / 2; if(guia) guia.style.display = ''; }
+          else if(guia) guia.style.display = 'none';
+        }
+      }
+      if(ghost){
+        // se mueve por DELTA desde donde estaba la caja (así el corrimiento
+        // del código de barras u otros offsets se conservan tal cual)
+        ghost.style.left = (gL + (d.x - inicio.x) / 100 * W) + 'px';
+        ghost.style.top = (gT + (d.y - inicio.y) / 100 * H) + 'px';
+        let sx = 1, sy = 1;
+        if(g === 'se' && inicio.s && d.s !== inicio.s) sx = sy = d.s / inicio.s;
+        if((g === 'e' || g === 'se') && inicio.ancho && d.ancho !== inicio.ancho) sx = d.ancho / inicio.ancho;
+        if((g === 's' || g === 'se') && inicio.alto && d.alto !== inicio.alto) sy = d.alto / inicio.alto;
+        ghost.style.transform = `scale(${sx},${sy})`;
+      }else{
+        aplicarVivo(el, k, esc, wd, hd, ft);
+      }
+    };
+    el.onpointerup = () => {
+      el.onpointermove = null;
+      const guia = document.getElementById('dis-guia');
+      if(guia) guia.style.display = 'none';
+      if(ghost){
+        // el render viejo + fantasma quedan en pantalla hasta que llega el
+        // nuevo (sin saltos de aspecto); refrescarFondo redibuja al terminar
+        bgPendiente = true;
+        chip(true);
+        clearTimeout(bgTimer);
+        bgTimer = setTimeout(refrescarFondo, 120);
+      }else{
+        dibujarEtiqueta();
+      }
+    };
+  });
+  el.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    seleccionarDis(k, true);
+    guardaUndo();
+    const d = diseno[k];
+    const t = elemMeta(k).tipo;
+    const paso = ev.deltaY < 0 ? 1 : -1;
+    if(t === 'codigo') d.alto = Math.min(65, Math.max(8, d.alto + paso * 1.5));
+    else if(t === 'raya') d.ancho = Math.min(100 - d.x, Math.max(5, d.ancho + paso * 2));
+    else if(t === 'caja') d.alto = Math.min(90, Math.max(3, d.alto + paso * 1.5));
+    else if(d.s) d.s = Math.min(240, Math.max(14, d.s + paso * 3));
+    dibujarEtiqueta();
+  }, {passive:false});
+}
+window.addEventListener('resize', () => { if(vista === 'diseno' && diseno) dibujarEtiqueta(true); });
+/* teclado: flechas mueven fino, Supr quita, Ctrl+Z deshace */
+document.addEventListener('keydown', ev => {
+  if(vista !== 'diseno' || !diseno) return;
+  if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(ev.ctrlKey && ev.key.toLowerCase() === 'z'){ ev.preventDefault(); deshacer(); return; }
+  if(!disSel || !diseno[disSel]) return;
+  const d = diseno[disSel];
+  const paso = ev.shiftKey ? 1.5 : 0.3;
+  let hecho = true;
+  if(ev.key === 'ArrowLeft')       d.x = Math.max(0, (d.x || 0) - paso);
+  else if(ev.key === 'ArrowRight') d.x = Math.min(97, (d.x || 0) + paso);
+  else if(ev.key === 'ArrowUp')    d.y = Math.max(0, (d.y || 0) - paso);
+  else if(ev.key === 'ArrowDown')  d.y = Math.min(97, (d.y || 0) + paso);
+  else if(ev.key === 'Delete'){
+    ev.preventDefault();
+    if(elemMeta(disSel).extra){ eliminarElem(disSel); }
+    else{ guardaUndo(1); d.on = false; disSel = null; construirPanelDiseno(); dibujarEtiqueta(); }
+    return;
+  }
+  else hecho = false;
+  if(hecho){ ev.preventDefault(); guardaUndo(); dibujarEtiqueta(); }
+});
+
+/* --- vista real (así imprime la Zebra), guardar, prueba --- */
+async function previewReal(){
+  const ov = modal('👁 Así saldrá impresa',
+    `<div style="text-align:center;min-height:120px"><span class="hint">Generando…</span></div>`,
+    [{t:'Cerrar', p:1}]);
+  try{
+    const r = await fetch(disTab === 'desc' ? '/api/etiqueta/preview_desc'
+                                            : '/api/etiqueta/preview', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({diseno, sku:document.getElementById('dis-sku').value.trim()})});
+    if(!r.ok){
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || 'Error ' + r.status);
+    }
+    const url = URL.createObjectURL(await r.blob());
+    ov.querySelector('.m-cuerpo div').innerHTML =
+      `<img src="${url}" style="max-width:100%;border:1px solid #E1DFDD;border-radius:8px">
+       <div class="hint" style="margin-top:6px">${disTab === 'desc'
+         ? 'Así saldrá por la impresora SAT (dibujada aquí mismo, sin internet).'
+         : 'Imagen generada por internet con el motor real de impresión (ZPL).'}</div>`;
+  }catch(e){
+    ov.querySelector('.m-cuerpo div').innerHTML = `<span class="hint">✖ ${e.message}</span>`;
+  }
+}
+async function guardarDiseno(){
+  try{
+    await api('/api/etiqueta/guardar', {diseno: disenos.cb, diseno_desc: disenos.desc});
+    toast('✔ Diseños guardados — así saldrán todas las etiquetas (código y descripción)');
+  }catch(e){ toast('✖ ' + e.message); }
+}
+function restaurarDiseno(){
+  guardaUndo(1);
+  diseno = disenos[disTab] = JSON.parse(JSON.stringify(origs[disTab]));
+  disSel = null;
+  construirPanelDiseno();
+  dibujarEtiqueta();
+  toast('Diseño original restaurado (Ctrl+Z para volver; Guardar si lo quieres así)');
+}
+async function imprimirPrueba(btn){
+  btn.disabled = true; btn.textContent = 'Imprimiendo…';
+  try{
+    const j = await api(disTab === 'desc' ? '/api/etiqueta/prueba_desc' : '/api/etiqueta/prueba',
+      {diseno, sku:document.getElementById('dis-sku').value.trim()});
+    toast(j.msg);
+  }catch(e){ toast('✖ ' + e.message); }
+  btn.disabled = false; btn.textContent = '🖨 Imprimir prueba';
+}
+
+/* ---------------- configuración ---------------- */
+function opcionesPapel(actual){
+  return [['','Como está la impresora'],
+          ['gap','Etiquetas troqueladas (con separación)'],
+          ['marca','Etiquetas con marca negra'],
+          ['continuo','Papel continuo (sin separación)']].map(([v, n]) =>
+    `<option value="${v}" ${(actual || '') === v ? 'selected' : ''}>${n}</option>`).join('');
+}
+/* botón ⚙ Avanzado: abre las Preferencias de impresión de Windows del driver */
+let listaImpWin = [];
+function elegirImpWin(tipo, i, btn){
+  btn.closest('.overlay').remove();
+  avanzadoImpresora(tipo, listaImpWin[i]);
+}
+async function avanzadoImpresora(tipo, nombre){
+  try{
+    const j = await api('/api/impresora/avanzado', {tipo, nombre: nombre || ''});
+    if(j.ok){
+      toast(`✔ Se abrió la ventana de Windows de «${j.nombre}» — búscala en la pantalla del PC principal`);
+      return;
+    }
+    if(j.lista && j.lista.length){
+      listaImpWin = j.lista;
+      modal(`¿Cuál es la impresora ${tipo === 'sat' ? 'SAT' : 'Zebra'} en Windows?`,
+        `<div class="hint">Elígela tal como está instalada en Windows; queda recordada
+         y se abre su ventana de configuración:</div>` +
+        j.lista.map((n, i) => `<button class="btn" style="display:block;width:100%;margin-top:6px"
+          onclick="elegirImpWin('${tipo}', ${i}, this)">${esc(n)}</button>`).join(''),
+        [{t:'Cerrar', p:1}]);
+    }else toast('✖ ' + (j.error || 'No se pudo abrir la configuración'));
+  }catch(e){ toast('✖ ' + e.message); }
+}
+async function configUI(){
+  let c;
+  try{ c = await api('/api/config'); }catch(e){ toast('✖ ' + e.message); return; }
+  modal('Configuración',
+    `<label>Texto inferior de la etiqueta (web)<input id="c-emp" value="${esc(c.nombre_empresa)}"></label>
+     <div class="fila2">
+       <label>IP impresora Zebra
+         <div style="display:flex;gap:6px">
+           <input id="c-ip" value="${esc(c.impresora_ip)}" style="flex:1">
+           <button class="btn" type="button" id="c-buscar" onclick="buscarImpresora()"
+                   title="Buscar la impresora en la red">🔍</button>
+         </div>
+       </label>
+       <label>Puerto<input id="c-pto" type="number" value="${c.impresora_puerto}"></label>
+     </div>
+     <div class="fila2">
+       <label>DPI<input id="c-dpi" type="number" value="${c.dpi}"></label>
+       <label>Etiqueta ancho × alto (mm)
+         <span style="display:flex;gap:6px">
+           <input id="c-an" type="number" step="0.1" value="${c.etiqueta_ancho_mm}">
+           <input id="c-al" type="number" step="0.1" value="${c.etiqueta_alto_mm}">
+         </span></label>
+     </div>
+     <div class="fila2">
+       <label>Oscuridad (0-30, más = mejor marcado)
+         <input id="c-osc" type="number" min="0" max="30" value="${c.oscuridad ?? 27}"></label>
+       <label>Velocidad (2 = mejor calidad, 7 = rápida)
+         <input id="c-vel" type="number" min="2" max="7" value="${c.velocidad ?? 3}"></label>
+     </div>
+     <div class="fila2">
+       <label>Tipo de papel (Zebra)
+         <select id="c-papel">${opcionesPapel(c.papel_tipo)}</select></label>
+       <label>Más opciones del driver
+         <button class="btn" type="button" onclick="avanzadoImpresora('zebra')"
+                 title="Abre las Preferencias de impresión de Windows (en el PC principal)">⚙ Avanzado…</button>
+       </label>
+     </div>
+     <label>Carpeta de fotos de productos (local o de red)
+       <span style="display:flex;gap:6px">
+         <input id="c-fotos" value="${esc(c.fotos_ruta || '')}" style="flex:1"
+                placeholder="\\\\SERVIDOR\\carpeta">
+         <button class="btn" type="button" onclick="elegirCarpeta('c-fotos')"
+                 title="Buscar la carpeta en el PC servidor (funciona desde cualquier equipo)">📂 Buscar…</button>
+       </span></label>
+     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+       IMPRESORA SAT — ETIQUETAS DE DESCRIPCIÓN (sin chip)</div>
+     <div class="fila2">
+       <label>IP impresora SAT
+         <div style="display:flex;gap:6px">
+           <input id="c-sat-ip" value="${esc(c.sat_ip || '')}" style="flex:1" placeholder="192.168.0.__">
+           <button class="btn" type="button" id="c-sat-buscar" onclick="buscarImpresoraSat()"
+                   title="Buscar equipos con puerto de impresión en la red">🔍</button>
+         </div>
+       </label>
+       <label>Puerto<input id="c-sat-pto" type="number" value="${c.sat_puerto ?? 9100}"></label>
+     </div>
+     <div class="fila2">
+       <label>Etiqueta descripción ancho × alto (mm)
+         <span style="display:flex;gap:6px">
+           <input id="c-sat-an" type="number" step="0.1" value="${c.sat_ancho_mm ?? 50}">
+           <input id="c-sat-al" type="number" step="0.1" value="${c.sat_alto_mm ?? 40}">
+         </span></label>
+       <label>DPI de la SAT (casi siempre 203)
+         <input id="c-sat-dpi" type="number" value="${c.sat_dpi ?? 203}"></label>
+     </div>
+     <div class="fila2">
+       <label>Lenguaje de la SAT
+         <select id="c-sat-len">
+           <option value="tspl" ${(c.sat_lenguaje || 'tspl') !== 'zpl' ? 'selected' : ''}>SAT / TSC (normal)</option>
+           <option value="zpl" ${c.sat_lenguaje === 'zpl' ? 'selected' : ''}>ZPL (modo Zebra)</option>
+         </select></label>
+       <label>Oscuridad SAT (0-15)
+         <input id="c-sat-osc" type="number" min="0" max="15" value="${c.sat_oscuridad ?? 12}"></label>
+     </div>
+     <div class="fila2">
+       <label>Tipo de papel (SAT)
+         <select id="c-sat-papel">${opcionesPapel(c.sat_papel_tipo)}</select></label>
+       <label>Más opciones del driver
+         <button class="btn" type="button" onclick="avanzadoImpresora('sat')"
+                 title="Abre las Preferencias de impresión de Windows (en el PC principal)">⚙ Avanzado…</button>
+       </label>
+     </div>
+     <label class="chk"><input type="checkbox" id="c-sat-doble" ${c.sat_doble ? 'checked' : ''}
+            onchange="document.getElementById('c-sat-doble-op').style.display=this.checked?'':'none'">
+       El rollo de la SAT trae DOS etiquetas lado a lado (una a la izquierda, otra a la derecha)</label>
+     <div class="fila2" id="c-sat-doble-op" style="display:${c.sat_doble ? '' : 'none'}">
+       <label>Separación entre las dos (mm)
+         <input id="c-sat-sep" type="number" step="0.1" value="${c.sat_sep_mm ?? 4}"></label>
+       <label>¿Cuál de las dos usar?
+         <select id="c-sat-lado">
+           <option value="izquierda" ${(c.sat_lado || 'izquierda') === 'izquierda' ? 'selected' : ''}>Izquierda</option>
+           <option value="derecha" ${c.sat_lado === 'derecha' ? 'selected' : ''}>Derecha</option>
+           <option value="ambas" ${c.sat_lado === 'ambas' ? 'selected' : ''}>Ambas (repite en las dos, no desperdicia)</option>
+         </select></label>
+     </div>
+     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+       COPIA DE SEGURIDAD (respaldo de los datos)</div>
+     <label class="chk"><input type="checkbox" id="c-resp" ${c.respaldo_activo !== false ? 'checked' : ''}>
+       Hacer una copia automática cada día</label>
+     <div class="fila2">
+       <label>Hora de la copia (24h)
+         <input id="c-resp-hora" type="time" value="${esc(c.respaldo_hora || '05:20')}"></label>
+       <label>Copias a conservar
+         <input id="c-resp-dias" type="number" min="1" max="365" value="${c.respaldo_dias ?? 30}"></label>
+     </div>
+     <label>Carpeta de las copias (vacío = junto al programa)
+       <span style="display:flex;gap:6px">
+         <input id="c-resp-carp" value="${esc(c.respaldo_carpeta || '')}" style="flex:1"
+                placeholder="carpeta 'respaldos' junto al programa">
+         <button class="btn" type="button" onclick="elegirCarpeta('c-resp-carp')"
+                 title="Buscar la carpeta en el PC servidor (funciona desde cualquier equipo)">📂 Buscar…</button>
+       </span></label>
+     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+       🚦 SEMÁFORO DE ROTACIÓN (verde / ámbar / rojo)</div>
+     <div class="fila2">
+       <label>Se miran las ventas de los últimos (días)
+         <input id="c-rot-dias" type="number" min="1" max="3650" value="${c.rotacion_dias ?? 180}"></label>
+       <label>Desde cuántas unidades es ALTA
+         <input id="c-rot-alta" type="number" min="1" value="${c.rotacion_alta ?? 10}"></label>
+     </div>
+     <label>Desde cuántas unidades es MEDIA (menos que eso = BAJA)
+       <input id="c-rot-media" type="number" min="1" value="${c.rotacion_media ?? 3}"></label>
+     <div class="hint">Solo cuentan las salidas marcadas como <b>venta</b>: los ajustes
+       y las importaciones no mueven el semáforo.</div>
+     <label>Descuento para calcular el COSTO al exportar (%)
+       <input id="c-costo-desc" type="number" min="0" max="100" value="${c.costo_descuento ?? 48}"
+              placeholder="48 = costo es el precio menos 48%"></label>
+     <div style="display:flex;align-items:center;gap:8px">
+       <button class="btn" type="button" onclick="respaldarAhora(this)">💾 Hacer copia ahora</button>
+       <span class="hint" id="c-resp-msg"></span>
+     </div>
+     <label class="chk"><input type="checkbox" id="c-rfid" ${c.codificar_rfid ? 'checked' : ''}>
+       Grabar chip RFID al imprimir (ZT411R)</label>
+     <label class="chk"><input type="checkbox" id="c-bt" ${c.bartender ? 'checked' : ''}>
+       Imprimir con BarTender (usa el diseño .btw)</label>
+     <label>Programa BarTender<input id="c-btexe" value="${esc(c.bartender_exe)}"></label>
+     <label>Plantilla .btw<input id="c-btpl" value="${esc(c.bartender_plantilla)}" placeholder="C:\\ruta\\diseño.btw"></label>
+     <label>Impresora de Windows (opcional)<input id="c-btprn" value="${esc(c.bartender_impresora)}"></label>`,
+    [{t:'Cancelar'}, {t:'Guardar', p:1, f:async ov => {
+      const q = x => ov.querySelector(x);
+      try{
+        await api('/api/config', {
+          nombre_empresa:q('#c-emp').value, impresora_ip:q('#c-ip').value.trim(),
+          impresora_puerto:+q('#c-pto').value, dpi:+q('#c-dpi').value,
+          etiqueta_ancho_mm:+q('#c-an').value, etiqueta_alto_mm:+q('#c-al').value,
+          oscuridad:+q('#c-osc').value, velocidad:+q('#c-vel').value,
+          papel_tipo:q('#c-papel').value,
+          fotos_ruta:q('#c-fotos').value.trim(),
+          sat_ip:q('#c-sat-ip').value.trim(), sat_puerto:+q('#c-sat-pto').value,
+          sat_ancho_mm:+q('#c-sat-an').value, sat_alto_mm:+q('#c-sat-al').value,
+          sat_dpi:+q('#c-sat-dpi').value, sat_lenguaje:q('#c-sat-len').value,
+          sat_oscuridad:+q('#c-sat-osc').value, sat_papel_tipo:q('#c-sat-papel').value,
+          sat_doble:q('#c-sat-doble').checked, sat_sep_mm:+q('#c-sat-sep').value,
+          sat_lado:q('#c-sat-lado').value,
+          respaldo_activo:q('#c-resp').checked, respaldo_hora:q('#c-resp-hora').value,
+          respaldo_dias:+q('#c-resp-dias').value, respaldo_carpeta:q('#c-resp-carp').value.trim(),
+          costo_descuento:+q('#c-costo-desc').value,
+          rotacion_dias:+q('#c-rot-dias').value, rotacion_alta:+q('#c-rot-alta').value,
+          rotacion_media:+q('#c-rot-media').value,
+          codificar_rfid:q('#c-rfid').checked, bartender:q('#c-bt').checked,
+          bartender_exe:q('#c-btexe').value.trim(), bartender_plantilla:q('#c-btpl').value.trim(),
+          bartender_impresora:q('#c-btprn').value.trim()});
+        ov.remove(); toast('✔ Configuración guardada');
+        // el diseñador usa estas medidas: que las vea al instante
+        cfgEtq = null;
+        if(vista === 'diseno'){
+          try{ cfgEtq = await api('/api/config'); dibujarEtiqueta(); }catch(e2){}
+        }
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+
+async function respaldarAhora(btn){
+  const msg = btn.parentNode.querySelector('#c-resp-msg');
+  btn.disabled = true; if(msg) msg.textContent = 'Copiando…';
+  try{
+    const j = await api('/api/respaldo/ahora', {});
+    if(msg) msg.textContent = j.msg || '✔ Copia hecha';
+    toast(j.msg || '✔ Copia de seguridad hecha');
+  }catch(e){ if(msg) msg.textContent = '✖ ' + e.message; toast('✖ ' + e.message); }
+  btn.disabled = false;
+}
+function acercaDe(){
+  modal('Inventario RFID',
+    `<div class="hint" style="font-size:13px;line-height:1.7">
+       <b>En la pistola C72 / celular:</b><br>
+       <span class="mono" style="font-size:14px">${IP_PISTOLA}</span><br><br>
+       <b>En cualquier navegador de este PC:</b><br>
+       <span class="mono">http://localhost:5000</span><br><br>
+       Esta ventana es el modo escritorio (Productos e Inventario).
+       Al cerrarla se apaga también el servidor.</div>`,
+    [{t:'Cerrar', p:1}]);
+}
+
+/* ---------------- estado general ---------------- */
+/* aviso de la COPIA DE SEGURIDAD: el servidor la hace solo a la hora fijada,
+   así que se avisa en pantalla cuando aparece una copia nueva */
+let respaldoVisto = null;
+function avisarRespaldo(r){
+  if(!r || !r.cuando) return;
+  if(respaldoVisto === null){ respaldoVisto = r.cuando; return; }  // la de antes de abrir
+  if(r.cuando === respaldoVisto) return;
+  respaldoVisto = r.cuando;
+  const hora = String(r.cuando).slice(11, 16);
+  modal('💾 Copia de seguridad hecha', `
+    <p>Se guardó una copia de todo el inventario a las <b>${esc(hora)}</b>.</p>
+    <div class="hint" style="word-break:break-all">${esc(r.ruta || '')}
+      ${r.kb ? ` · ${fmt(r.kb)} KB` : ''}</div>
+    <div class="hint" style="margin-top:8px">Se hace sola cada día a la hora que
+    está en ⚙ Configuración. Si algo se daña, con este archivo se recupera todo.</div>`,
+    [{t:'Entendido', p:1}]);
+}
+
+async function stats(){
+  try{
+    const j = await api('/api/dashboard');
+    avisarRespaldo(j.respaldo);
+    document.getElementById('b-der').textContent =
+      `${fmt(j.productos)} productos · ${fmt(j.tags)} etiquetas` +
+      (j.sesion ? ` · sesión abierta: ${j.sesion.nombre}` : '') +
+      `  |  Pistola: ${IP_PISTOLA}`;
+    const d = await api('/api/desconocidos');
+    badgeDesc(d.length);
+  }catch(e){ /* servidor ocupado: se reintenta en el próximo ciclo */ }
+}
+setInterval(stats, 10000);
+
+/* ---------------- arranque ---------------- */
+cargarProductos();
+stats();
+</script>
+</body>
+</html>

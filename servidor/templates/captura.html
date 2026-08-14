@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block body %}
+<div class="titulo"><h1>Captura rápida</h1>
+<span class="sub">para cualquier lector en modo teclado</span></div>
+
+<div class="card captura-caja">
+  <p style="color:var(--dim)">Deja el cursor en el campo y dispara.
+  Sirve para la C72 con emulación de teclado, lectores USB y otras marcas.
+  Cada lectura entra en la sesión de conteo activa.</p>
+  <form method="post">
+    <input id="campo-scan" name="epc" placeholder="esperando lectura…" autocomplete="off" autofocus>
+  </form>
+  {% if resultado %}
+  <div class="res-scan" id="hubo-lectura" data-ok="{{'1' if resultado['producto'] else '0'}}">
+    <div class="epc">{{resultado['epc']}}</div>
+    {% if resultado['producto'] %}
+      <div class="prod"><span class="tag ok">{{resultado['producto']['sku']}}</span>
+      &nbsp;{{resultado['producto']['nombre']}}
+      <span style="color:var(--dim)">· {{resultado['producto']['ubicacion']}}</span></div>
+    {% else %}
+      <div class="prod"><span class="tag warn">EPC sin producto asociado</span></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
