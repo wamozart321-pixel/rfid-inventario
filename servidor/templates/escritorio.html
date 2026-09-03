@@ -204,6 +204,9 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
     <div class="g-bots">
       <button class="bg" onclick="verDesconocidos()"><span class="ic">❓</span>Desconocidos
         <span id="badge-desc" class="badge" style="display:none">0</span></button>
+      <button class="bg" onclick="verBalizas()"
+              title="Etiquetas fijas del estante que dicen dónde está la pistola">
+        <span class="ic">🧭</span>Balizas</button>
       <button class="bg" onclick="actualizar()"><span class="ic">🔄</span>Actualizar</button>
     </div>
     <div class="g-tit">Revisión</div>
@@ -390,6 +393,60 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
     </table></div>
   </div>
 
+  <div class="vista oculta" id="v-balizas">
+    <div class="cab">
+      <b>🧭 Balizas de posición</b>
+      <span class="hint">— etiquetas fijas pegadas al estante: al leerlas, la pistola sabe dónde está</span>
+      <button class="btn prim" style="margin-left:auto" onclick="imprimirBalizas()">🖨️ Imprimir balizas</button>
+      <button class="btn" onclick="nuevaBaliza()">➕ Una a mano</button>
+      <button class="btn" onclick="verBalizas()">🔄 Actualizar</button>
+    </div>
+
+    <div id="bal-pistolas" style="margin:8px 10px 0;padding:9px 12px;border-radius:6px;
+         border:1px solid #E1DFDD;background:#F3F2F1;line-height:1.5"></div>
+
+    <div style="display:flex;gap:12px;align-items:flex-start;padding:10px;overflow:auto;flex:1">
+
+      <div style="flex:0 0 46%;min-width:360px">
+        <div style="font-weight:600;margin-bottom:6px">Balizas puestas</div>
+        <table id="t-balizas" style="width:100%">
+          <thead><tr>
+            <th style="width:52%">Sitio</th><th>Etiqueta</th>
+            <th class="num" style="width:80px">Sitúa</th><th style="width:70px"></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="hint" style="margin-top:8px;line-height:1.5">
+          «Sitúa» = cuántas lecturas se han apuntado en ese sitio gracias a la baliza.
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:380px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-weight:600">Posiciones que propone el conteo</span>
+          <span id="bal-ses" class="hint"></span>
+          <button class="btn mini" style="margin-left:auto" onclick="marcarPropuestas(true)">Marcar todo</button>
+          <button class="btn mini" onclick="marcarPropuestas(false)">Ninguno</button>
+          <button class="btn mini prim" onclick="aplicarPropuestas()">✔ Aplicar marcadas</button>
+        </div>
+        <table id="t-propuestas" style="width:100%">
+          <thead><tr>
+            <th style="width:34px"></th><th style="width:110px">Referencia</th>
+            <th>Repuesto</th><th style="width:150px">Bodega</th>
+            <th style="width:150px">Posición</th><th class="num" style="width:95px">Seguridad</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="hint" style="margin-top:8px;line-height:1.5">
+          Nada se guarda solo: aquí solo se <b>propone</b>. Marca lo que quieras y pulsa Aplicar.<br>
+          «Seguridad» = qué tanto coincidieron las lecturas en el mismo sitio. Por debajo del
+          60&nbsp;% conviene mirarlo con calma (suele ser eco del pasillo de al lado).
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 <!-- barra de estado -->
@@ -476,6 +533,7 @@ function actualizar(){
   else if(vista === 'sesion') cargarResumen();
   else if(vista === 'desconocidos') verDesconocidos();
   else if(vista === 'ventas') verVentas();
+  else if(vista === 'balizas') verBalizas();
 }
 
 /* Busca por PALABRAS SUELTAS y en cualquier orden: escribiendo «pastillas t5»
@@ -1327,6 +1385,24 @@ const ROTACION = {
 function rotDe(p){ return ROTACION[p && p.rotacion] || ROTACION.baja; }
 
 /* Semáforo GRANDE (ventana de información, al lado de las fotos) */
+/* Botones para poner la rotación A MANO. Los usan los DOS semáforos (el grande
+   de Información y el chico de Modificar), así que hay un solo sitio que
+   cambiar. Los asesores también los tienen: entran por Información. */
+function botonesRotacion(p){
+  const niveles = ['alta', 'media', 'baja'];
+  const botones = niveles.map(n => `
+    <button class="btn mini" type="button" onclick="cambiarRotacion(${p.id}, '${n}')"
+            title="Poner a mano en ${ROTACION[n].t}"
+            style="border-color:${ROTACION[n].color};color:${ROTACION[n].color};
+                   ${p.rotacion === n ? 'font-weight:800;background:' + ROTACION[n].fondo : ''}">
+      ${ROTACION[n].icono} ${n.toUpperCase()}</button>`).join('');
+  return `<span class="hint" style="margin:0">Cambiar a mano:</span>
+    ${botones}
+    ${p.rotacion_manual ? `<button class="btn mini" type="button"
+        onclick="cambiarRotacion(${p.id}, '')"
+        title="Que vuelva a calcularse sola con las ventas">↺ Automática</button>` : ''}`;
+}
+
 function semaforoGrande(p){
   const r = rotDe(p), niveles = ['alta', 'media', 'baja'];
   const luces = niveles.map(n => {
@@ -1335,17 +1411,23 @@ function semaforoGrande(p){
       background:${enc ? ROTACION[n].color : '#DDDBD9'};
       box-shadow:${enc ? '0 0 9px ' + ROTACION[n].color : 'none'}"></div>`;
   }).join('');
-  return `<div style="display:flex;gap:10px;align-items:center;border:2px solid ${r.color};
-       background:${r.fondo};border-radius:10px;padding:8px 10px">
-    <div style="background:#2B2B2B;border-radius:9px;padding:5px 4px;flex:none">${luces}</div>
-    <div style="min-width:0">
-      <div style="font-size:15px;font-weight:800;color:${r.color};line-height:1.15">
-        ${r.icono} ${r.t}</div>
-      <div style="font-size:11.5px;color:#4C4A48;margin-top:3px">${r.d}</div>
-      <div style="font-size:11px;color:#8A8886;margin-top:3px">
-        ${p.rotacion_manual
-          ? '✋ puesta a mano (no cambia sola)'
-          : fmt(p.vendidos || 0) + ' unidad(es) vendida(s) en el periodo'}</div>
+  return `<div style="border:2px solid ${r.color};background:${r.fondo};
+       border-radius:10px;padding:8px 10px">
+    <div style="display:flex;gap:10px;align-items:center">
+      <div style="background:#2B2B2B;border-radius:9px;padding:5px 4px;flex:none">${luces}</div>
+      <div style="min-width:0">
+        <div style="font-size:15px;font-weight:800;color:${r.color};line-height:1.15">
+          ${r.icono} ${r.t}</div>
+        <div style="font-size:11.5px;color:#4C4A48;margin-top:3px">${r.d}</div>
+        <div style="font-size:11px;color:#8A8886;margin-top:3px">
+          ${p.rotacion_manual
+            ? '✋ puesta a mano (no cambia sola)'
+            : fmt(p.vendidos || 0) + ' unidad(es) vendida(s) en el periodo'}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center;margin-top:7px;flex-wrap:wrap;
+         border-top:1px solid ${r.color};padding-top:6px">
+      ${botonesRotacion(p)}
     </div>
   </div>`;
 }
@@ -1360,12 +1442,6 @@ function semaforoChico(p){
       margin:0 2px;background:${enc ? ROTACION[n].color : '#DDDBD9'};
       box-shadow:${enc ? '0 0 6px ' + ROTACION[n].color : 'none'}"></span>`;
   }).join('');
-  const botones = niveles.map(n => `
-    <button class="btn mini" type="button" onclick="cambiarRotacion(${p.id}, '${n}')"
-            title="Poner a mano en ${ROTACION[n].t}"
-            style="border-color:${ROTACION[n].color};color:${ROTACION[n].color};
-                   ${p.rotacion === n ? 'font-weight:800;background:' + ROTACION[n].fondo : ''}">
-      ${ROTACION[n].icono} ${n.toUpperCase()}</button>`).join('');
   return `<div style="border:2px solid ${r.color};background:${r.fondo};
        border-radius:8px;padding:6px 9px;margin-top:4px">
     <div style="display:flex;gap:9px;align-items:center">
@@ -1376,10 +1452,7 @@ function semaforoChico(p){
         ${manual ? '✋ puesta a mano' : fmt(p.vendidos || 0) + ' vendidas<br>en el periodo'}</span>
     </div>
     <div style="display:flex;gap:4px;align-items:center;margin-top:6px;flex-wrap:wrap">
-      <span class="hint" style="margin:0">Cambiar a mano:</span>
-      ${botones}
-      ${manual ? `<button class="btn mini" type="button" onclick="cambiarRotacion(${p.id}, '')"
-            title="Que vuelva a calcularse sola con las ventas">↺ Automática</button>` : ''}
+      ${botonesRotacion(p)}
     </div>
   </div>`;
 }
@@ -1395,9 +1468,11 @@ function cambiarRotacion(pid, nivel){
       p.rotacion = nivel || p.rotacion_auto || 'baja';
       o.remove();
       toast(j.msg);
-      // se repinta el recuadro sin cerrar la ficha
-      const zona = document.getElementById('f-rot');
-      if(zona) zona.innerHTML = semaforoChico(p);
+      // se repinta el recuadro sin cerrar la ficha, esté donde esté abierta
+      const chico = document.getElementById('f-rot');      // Modificar producto
+      if(chico) chico.innerHTML = semaforoChico(p);
+      const grande = document.getElementById('i-rot');     // Información
+      if(grande) grande.innerHTML = semaforoGrande(p);
       renderProductos();
     }catch(e){ toast('✖ ' + e.message); }
   };
@@ -1464,7 +1539,7 @@ function infoProducto(){
         <div class="hint" style="margin:0 0 3px;text-align:center">📷 Foto</div>
         <img id="i-foto" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
         <div class="hint" id="i-foto-msg" style="text-align:center">buscando…</div>
-        <div style="margin-top:8px">${semaforoGrande(p)}</div>
+        <div id="i-rot" style="margin-top:8px">${semaforoGrande(p)}</div>
       </div>
       <div>
         <div class="hint" style="margin:0 0 3px;text-align:center">🏷️ Etiqueta código</div>
@@ -2111,6 +2186,242 @@ async function ignorarDesc(epc){
     await api('/api/ignorar', {epc});
     toast('✔ EPC ignorado — no volverá a aparecer'); verDesconocidos();
   }catch(e){ toast('✖ ' + e.message); }
+}
+
+/* ---------------- INVENTARIO: balizas de posición ----------------
+   Una baliza es una etiqueta RFID pegada al estante (no a un repuesto). Al
+   leerla, la pistola queda «situada» y todo lo que lea después se apunta ahí.
+   Así se sabe DÓNDE está cada cosa sin navegación ni sensores caros. */
+let propuestas = [];
+
+function colorSeg(p){
+  if(p >= 80) return ROTACION.alta;
+  if(p >= 60) return ROTACION.media;
+  return ROTACION.baja;
+}
+
+async function verBalizas(){
+  mostrarVista('balizas');
+  await Promise.all([cargarBalizas(), cargarPropuestas(), cargarPistolas()]);
+}
+
+/* Dice si la pistola está VIENDO las balizas. Si aquí no sale nada es que la
+   pistola no ha pasado por ninguna, y por eso no habrá propuestas. */
+async function cargarPistolas(){
+  const caja = document.getElementById('bal-pistolas');
+  try{
+    const p = await api('/api/balizas/pistolas');
+    if(!p.length){
+      caja.style.background = '#FDF6E3'; caja.style.borderColor = '#E8D9A0';
+      caja.innerHTML = `⚠️ <b>Ninguna pistola ha leído una baliza todavía.</b>
+        <span class="hint">Mientras esto siga así no puede haber propuestas: hay que
+        apuntar la pistola a la etiqueta de la baliza y disparar antes de leer el estante.</span>`;
+      return;
+    }
+    caja.style.background = '#EAF6EE'; caja.style.borderColor = '#BFE3CC';
+    caja.innerHTML = '📍 ' + p.map(x =>
+      `<b>${esc(x.dispositivo)}</b> en ${esc(x.bodega)} / <b>${esc(x.posicion)}</b>
+       <span class="hint">(${x.minutos === 0 ? 'hace un momento' : 'hace ' + fmt(x.minutos) + ' min'}${
+         x.vigente ? '' : ' — caducada, hay que volver a leer una baliza'})</span>`).join(' &nbsp;·&nbsp; ');
+  }catch(e){ caja.textContent = ''; }
+}
+
+async function cargarBalizas(){
+  try{
+    const rows = await api('/api/balizas');
+    document.querySelector('#t-balizas tbody').innerHTML = rows.length
+      ? rows.map(b => `<tr>
+          <td><b>${esc(b.bodega)}</b> · ${esc(b.posicion)}
+              ${b.nota ? `<div class="hint">${esc(b.nota)}</div>` : ''}</td>
+          <td class="mono" style="font-size:11px">${esc(b.epc)}</td>
+          <td class="num">${fmt(b.situadas)}</td>
+          <td><button class="btn mini" onclick="borrarBaliza('${esc(b.epc)}')">Quitar</button></td>
+        </tr>`).join('')
+      : `<tr><td colspan="4" style="text-align:center;color:#8A8886;padding:30px">
+           Todavía no hay balizas.<br><span class="hint">Pega una etiqueta en el estante,
+           léela con la pistola y dale a «Nueva baliza».</span></td></tr>`;
+    bcont(`${fmt(rows.length)} balizas`);
+  }catch(e){ toast('✖ ' + e.message); }
+}
+
+async function cargarPropuestas(){
+  try{
+    const j = await api('/api/balizas/propuestas');
+    propuestas = j.propuestas || [];
+    document.getElementById('bal-ses').textContent =
+      j.sesion_id ? `(conteo nº ${j.sesion_id})` : '(no hay conteo abierto)';
+    document.querySelector('#t-propuestas tbody').innerHTML = propuestas.length
+      ? propuestas.map((p, i) => {
+          const c = colorSeg(p.confianza);
+          const eco = p.otras.length
+            ? ` title="También se leyó en: ${esc(p.otras.map(o => o.posicion + ' (' + o.veces + ')').join(', '))}"`
+            : '';
+          return `<tr${p.cambia ? '' : ' style="opacity:.5"'}>
+            <td><input type="checkbox" class="ck-prop" data-i="${i}"
+                       ${p.cambia && p.confianza >= 60 ? 'checked' : ''}></td>
+            <td class="mono">${esc(p.sku)}</td>
+            <td>${esc(p.nombre)}</td>
+            <td>${esc(p.bodega)}</td>
+            <td><b>${esc(p.posicion)}</b>
+                ${p.cambia && p.actual ? `<span class="hint"> (antes ${esc(p.actual)})</span>`
+                                       : (p.cambia ? '<span class="hint"> (nueva)</span>'
+                                                   : '<span class="hint"> — ya estaba</span>')}</td>
+            <td class="num"${eco}><span style="color:${c.color};font-weight:700">${p.confianza}%</span>
+                <span class="hint">${fmt(p.veces)}</span></td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="6" style="text-align:center;color:#8A8886;padding:30px">
+           Sin propuestas todavía.<br><span class="hint">Abre un conteo, lee una baliza
+           con la pistola y sigue leyendo los repuestos de ese estante.</span></td></tr>`;
+  }catch(e){ toast('✖ ' + e.message); }
+}
+
+function marcarPropuestas(v){
+  document.querySelectorAll('.ck-prop').forEach(ck => {
+    if(v){ if(propuestas[+ck.dataset.i].cambia) ck.checked = true; }
+    else ck.checked = false;
+  });
+}
+
+async function nuevaBaliza(){
+  let bodegas = [], sueltas = [];
+  try{ bodegas = await api('/api/bodegas'); }catch(e){}
+  try{ sueltas = await api('/api/desconocidos'); }catch(e){}
+  const ov = modal('🧭 Nueva baliza de posición',
+    `<div class="hint" style="margin-bottom:10px;line-height:1.5">
+       Pega una etiqueta RFID <b>en el estante</b> (no en un repuesto), léela con la pistola
+       y dile aquí a qué sitio corresponde.
+     </div>
+     ${sueltas.length ? `<label>Etiquetas leídas hace poco
+       <select id="f-bal-lista"><option value="">— escribirla a mano —</option>
+       ${sueltas.slice(0, 25).map(s => `<option value="${esc(s.epc)}">${esc(s.epc)} (${s.veces} lecturas)</option>`).join('')}
+       </select></label>` : ''}
+     <label>Número de la etiqueta (EPC)<input id="f-bal-epc" class="mono" placeholder="E28011700000..."></label>
+     <label>Bodega<select id="f-bal-bod">
+       ${bodegas.map(b => `<option>${esc(b)}</option>`).join('')}
+     </select></label>
+     <label>Posición dentro de la bodega<input id="f-bal-pos" placeholder="Ej: B12"></label>
+     <label>Nota (opcional)<input id="f-bal-nota" placeholder="Ej: estante del fondo, lado ventana"></label>`,
+    [{t:'Cancelar'}, {t:'Guardar baliza', p:1, f:async ov => {
+      const sel = ov.querySelector('#f-bal-lista');
+      const epc = (ov.querySelector('#f-bal-epc').value.trim()
+                   || (sel ? sel.value : '')).toUpperCase();
+      const bodega = ov.querySelector('#f-bal-bod').value;
+      const posicion = ov.querySelector('#f-bal-pos').value.trim().toUpperCase();
+      if(!epc){ toast('Falta el número de la etiqueta'); return; }
+      if(!posicion){ toast('Falta la posición'); return; }
+      try{
+        const j = await api('/api/balizas', {epc, bodega, posicion,
+                                             nota: ov.querySelector('#f-bal-nota').value.trim()});
+        ov.remove(); toast('✔ Baliza guardada en ' + j.sitio); cargarBalizas();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+  const sel = ov.querySelector('#f-bal-lista');
+  if(sel) sel.onchange = () => { ov.querySelector('#f-bal-epc').value = sel.value; };
+}
+
+/* Imprime un LOTE de balizas: se eligen bodega, letras y números, y la Zebra
+   graba el chip de cada una. El EPC lo pone el servidor, así que queda dado de
+   alta solo — no hay que leer nada con la pistola. */
+async function imprimirBalizas(){
+  let bodegas = [];
+  try{ bodegas = await api('/api/bodegas'); }catch(e){}
+  const letras = [];
+  for(let i = 65; i <= 90; i++) letras.push(String.fromCharCode(i));
+  const opLetras = v => letras.map(l => `<option${l === v ? ' selected' : ''}>${l}</option>`).join('');
+  const opNums = (v, max) => Array.from({length: max}, (_, i) => i + 1)
+                              .map(n => `<option${n === v ? ' selected' : ''}>${n}</option>`).join('');
+  const ov = modal('🖨️ Imprimir balizas de posición',
+    `<div class="hint" style="margin-bottom:10px;line-height:1.5">
+       Se imprime una etiqueta por casilla, con la posición <b>bien grande</b> y el chip ya grabado.
+       Quedan dadas de alta solas: no hay que leerlas con la pistola.
+     </div>
+     <label>Bodega<select id="f-bi-bod">${bodegas.map(b => `<option>${esc(b)}</option>`).join('')}</select></label>
+     <div style="display:flex;gap:10px">
+       <label style="flex:1">Letras — desde<select id="f-bi-l1">${opLetras('A')}</select></label>
+       <label style="flex:1">hasta<select id="f-bi-l2">${opLetras('F')}</select></label>
+     </div>
+     <div style="display:flex;gap:10px">
+       <label style="flex:1">Números — desde<select id="f-bi-n1">${opNums(1, 99)}</select></label>
+       <label style="flex:1">hasta<select id="f-bi-n2">${opNums(10, 99)}</select></label>
+     </div>
+     <div id="bi-resumen" style="margin-top:12px;background:#F3F2F1;border:1px solid #E1DFDD;
+          border-radius:6px;padding:10px;line-height:1.6">Calculando…</div>`,
+    [{t:'Cancelar'}, {t:'🖨️ Imprimir', p:1, f:async (ov, btn) => {
+      const d = datosBI(ov);
+      if(!d.total){ toast('No hay nada que imprimir'); return; }
+      btn.disabled = true; btn.textContent = 'Imprimiendo…';
+      try{
+        const j = await api('/api/balizas/imprimir', d);
+        ov.remove();
+        toast(j.error ? '⚠ ' + j.error : `✔ ${j.impresas} balizas impresas y dadas de alta`);
+        cargarBalizas();
+      }catch(e){ btn.disabled = false; btn.textContent = '🖨️ Imprimir'; toast('✖ ' + e.message); } }}]);
+
+  ['f-bi-bod', 'f-bi-l1', 'f-bi-l2', 'f-bi-n1', 'f-bi-n2'].forEach(
+    id => ov.querySelector('#' + id).onchange = () => resumenBI(ov));
+  resumenBI(ov);
+}
+
+function datosBI(ov){
+  const v = id => ov.querySelector('#' + id).value;
+  const l1 = v('f-bi-l1'), l2 = v('f-bi-l2');
+  const n1 = +v('f-bi-n1'), n2 = +v('f-bi-n2');
+  const nl = Math.abs(l2.charCodeAt(0) - l1.charCodeAt(0)) + 1;
+  return {bodega: v('f-bi-bod'), desde_letra: l1, hasta_letra: l2,
+          desde_num: n1, hasta_num: n2, total: nl * (Math.abs(n2 - n1) + 1)};
+}
+
+async function resumenBI(ov){
+  const caja = ov.querySelector('#bi-resumen');
+  const d = datosBI(ov);
+  caja.innerHTML = 'Calculando…';
+  try{
+    const j = await api('/api/balizas/imprimir', Object.assign({solo_ver: true}, d));
+    const ej = j.etiquetas.slice(0, 4).map(x => x.posicion).join(', ');
+    caja.innerHTML = `Se van a imprimir <b>${fmt(j.total)} etiquetas</b>
+      (${esc(j.bodega)}: ${esc(ej)}${j.total > 4 ? '… hasta ' + esc(j.etiquetas[j.total-1].posicion) : ''}).
+      <br><b>${fmt(j.nuevas)}</b> nuevas` +
+      (j.reimpresas ? ` · <b>${fmt(j.reimpresas)}</b> ya existían y se reimprimen con su mismo chip
+        <span class="hint">(sirve para reemplazar una etiqueta rota)</span>` : '') +
+      (j.total > 40 ? `<div style="color:#B3261E;margin-top:6px">⚠️ Son bastantes:
+        asegúrate de tener rollo suficiente.</div>` : '');
+  }catch(e){
+    caja.innerHTML = `<span style="color:#B3261E">${esc(e.message)}</span>`;
+  }
+}
+
+function borrarBaliza(epc){
+  modal('Quitar baliza',
+    `<div class="hint mono">${esc(epc)}</div>
+     <p>Se quita la baliza. Las posiciones que ya guardaste <b>no</b> se tocan.</p>`,
+    [{t:'Cancelar'}, {t:'Quitar', r:1, f:async ov => {
+      try{
+        await api('/api/balizas/borrar', {epc});
+        ov.remove(); toast('✔ Baliza quitada'); cargarBalizas();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+}
+
+function aplicarPropuestas(){
+  const cambios = [];
+  document.querySelectorAll('.ck-prop').forEach(ck => {
+    if(ck.checked){
+      const p = propuestas[+ck.dataset.i];
+      cambios.push({producto_id: p.producto_id, bodega: p.bodega, posicion: p.posicion});
+    }
+  });
+  if(!cambios.length){ toast('No hay nada marcado'); return; }
+  modal('Guardar posiciones',
+    `<p>Se van a guardar <b>${cambios.length}</b> posiciones tal como quedaron marcadas.</p>
+     <div style="background:#FDF6E3;border:1px solid #E8D9A0;border-radius:6px;padding:10px;line-height:1.5">
+       ⚠️ <b>Aviso:</b> esto <b>reemplaza</b> la posición que tenían esos repuestos en esa bodega.
+       Si alguna venía de la importación de Siigo, se pierde el valor anterior.
+     </div>`,
+    [{t:'Cancelar'}, {t:'Sí, guardar', p:1, f:async ov => {
+      try{
+        const j = await api('/api/balizas/aplicar', {cambios});
+        ov.remove(); toast(`✔ ${j.aplicados} posiciones guardadas`);
+        cargarPropuestas();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
 }
 
 /* ---------------- editor VISUAL de diseño de etiqueta ---------------- */
@@ -3178,11 +3489,69 @@ async function avanzadoImpresora(tipo, nombre){
     }else toast('✖ ' + (j.error || 'No se pudo abrir la configuración'));
   }catch(e){ toast('✖ ' + e.message); }
 }
+/* Cada impresora puede salir POR RED (escribiendo su IP) o POR WINDOWS (la
+   impresora instalada: sirve igual por USB que por red, y así no hay que
+   perseguir la IP cada vez que el router se la cambia). */
+function bloqueConexion(id, nombre, salida){
+  const win = (salida || 'red') === 'windows';
+  return `<div class="fila2" style="margin-top:6px">
+      <label>Cómo llega a la ${nombre}
+        <select id="c-${id}-salida" onchange="pintarConexion('${id}', this.closest('.overlay'))">
+          <option value="red"${win ? '' : ' selected'}>Por red (escribiendo su IP)</option>
+          <option value="windows"${win ? ' selected' : ''}>Por Windows (USB o la instalada)</option>
+        </select></label>
+      <label>Impresora de Windows
+        <select id="c-${id}-win"><option value="">— cargando… —</option></select></label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 8px">
+      <button class="btn" type="button" onclick="probarImpresora('${id}', this)">🖨️ Etiqueta de prueba</button>
+      <span class="hint" id="c-${id}-msg"></span>
+    </div>`;
+}
+
+function pintarConexion(id, ov){
+  if(!ov) return;
+  const win = ov.querySelector('#c-' + id + '-salida').value === 'windows';
+  ov.querySelector('#c-' + id + '-win').disabled = !win;
+  // si va por Windows, la IP deja de usarse: se apaga para que se note
+  (id === 'zeb' ? ['#c-ip', '#c-pto', '#c-buscar'] : ['#c-sat-ip', '#c-sat-pto', '#c-sat-buscar'])
+    .forEach(s => { const e = ov.querySelector(s); if(e){ e.disabled = win; e.style.opacity = win ? .45 : 1; } });
+}
+
+async function cargarImpresorasWin(ov){
+  let j;
+  try{ j = await api('/api/impresoras_windows'); }catch(e){ return; }
+  [['zeb', j.zebra], ['sat', j.sat]].forEach(([id, elegida]) => {
+    const sel = ov.querySelector('#c-' + id + '-win');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">— elige la impresora —</option>' +
+      j.lista.map(n => `<option${n === elegida ? ' selected' : ''}>${esc(n)}</option>`).join('');
+    pintarConexion(id, ov);
+  });
+}
+
+/* Saca una etiqueta de prueba POR LA RUTA QUE ESTÉ GUARDADA (hay que guardar
+   antes de probar, si se acaba de cambiar). */
+async function probarImpresora(id, btn){
+  const ov = btn.closest('.overlay');
+  const msg = ov.querySelector('#c-' + id + '-msg');
+  btn.disabled = true; msg.textContent = 'Enviando…'; msg.style.color = '';
+  try{
+    const j = await api('/api/impresora/probar', {tipo: id === 'zeb' ? 'zebra' : 'sat'});
+    msg.style.color = '#1F7A44'; msg.textContent = '✔ enviada ' + j.ruta;
+    toast('✔ ' + j.msg);
+  }catch(e){
+    msg.style.color = '#B3261E'; msg.textContent = '✖ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
 async function configUI(){
   let c;
   try{ c = await api('/api/config'); }catch(e){ toast('✖ ' + e.message); return; }
-  modal('Configuración',
+  const ov = modal('Configuración',
     `<label>Texto inferior de la etiqueta (web)<input id="c-emp" value="${esc(c.nombre_empresa)}"></label>
+     ${bloqueConexion('zeb', 'Zebra', c.zebra_salida)}
      <div class="fila2">
        <label>IP impresora Zebra
          <div style="display:flex;gap:6px">
@@ -3224,6 +3593,7 @@ async function configUI(){
        </span></label>
      <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
        IMPRESORA SAT — ETIQUETAS DE DESCRIPCIÓN (sin chip)</div>
+     ${bloqueConexion('sat', 'SAT', c.sat_salida)}
      <div class="fila2">
        <label>IP impresora SAT
          <div style="display:flex;gap:6px">
@@ -3274,6 +3644,23 @@ async function configUI(){
          </select></label>
      </div>
      <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+       ACTUALIZACIONES DEL PROGRAMA</div>
+     <div id="c-upd-caja" style="background:#F3F2F1;border:1px solid #E1DFDD;border-radius:6px;
+          padding:9px 12px;line-height:1.6;margin-bottom:6px">Versión instalada: <b>—</b></div>
+     <label class="chk"><input type="checkbox" id="c-upd-rev" ${c.actualizar_revisar !== false ? 'checked' : ''}>
+       Avisar cuando salga una versión nueva</label>
+     <label class="chk"><input type="checkbox" id="c-upd-auto" ${c.actualizar_auto !== false ? 'checked' : ''}>
+       Instalarla sola (se pone al día y se reinicia cuando nadie esté leyendo con la pistola)</label>
+     <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px">
+       <button class="btn" type="button" onclick="buscarActualizacion(this)">🔎 Buscar ahora</button>
+       <button class="btn prim" type="button" id="c-upd-inst" style="display:none"
+               onclick="instalarActualizacion(this)">⬇️ Instalar ahora</button>
+       <span class="hint" id="c-upd-msg"></span>
+     </div>
+     <div class="hint" style="margin-bottom:8px;line-height:1.5">Antes de actualizar se guarda
+       una copia del inventario, y la versión anterior queda junto al programa por si hubiera
+       que volver atrás. Los otros PCs no necesitan nada: cogen lo nuevo del servidor solos.</div>
+     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
        COPIA DE SEGURIDAD (respaldo de los datos)</div>
      <label class="chk"><input type="checkbox" id="c-resp" ${c.respaldo_activo !== false ? 'checked' : ''}>
        Hacer una copia automática cada día</label>
@@ -3321,6 +3708,8 @@ async function configUI(){
       try{
         await api('/api/config', {
           nombre_empresa:q('#c-emp').value, impresora_ip:q('#c-ip').value.trim(),
+          zebra_salida:q('#c-zeb-salida').value, zebra_impresora_win:q('#c-zeb-win').value,
+          sat_salida:q('#c-sat-salida').value, sat_impresora_win:q('#c-sat-win').value,
           impresora_puerto:+q('#c-pto').value, dpi:+q('#c-dpi').value,
           etiqueta_ancho_mm:+q('#c-an').value, etiqueta_alto_mm:+q('#c-al').value,
           oscuridad:+q('#c-osc').value, velocidad:+q('#c-vel').value,
@@ -3332,6 +3721,8 @@ async function configUI(){
           sat_oscuridad:+q('#c-sat-osc').value, sat_papel_tipo:q('#c-sat-papel').value,
           sat_doble:q('#c-sat-doble').checked, sat_sep_mm:+q('#c-sat-sep').value,
           sat_lado:q('#c-sat-lado').value,
+          actualizar_revisar:q('#c-upd-rev').checked,
+          actualizar_auto:q('#c-upd-auto').checked,
           respaldo_activo:q('#c-resp').checked, respaldo_hora:q('#c-resp-hora').value,
           respaldo_dias:+q('#c-resp-dias').value, respaldo_carpeta:q('#c-resp-carp').value.trim(),
           costo_descuento:+q('#c-costo-desc').value,
@@ -3347,6 +3738,8 @@ async function configUI(){
           try{ cfgEtq = await api('/api/config'); dibujarEtiqueta(); }catch(e2){}
         }
       }catch(e){ toast('✖ ' + e.message); } }}]);
+  cargarImpresorasWin(ov);
+  pintarEstadoUpd(ov);
 }
 
 async function respaldarAhora(btn){
@@ -3390,10 +3783,114 @@ function avisarRespaldo(r){
     [{t:'Entendido', p:1}]);
 }
 
+/* ---------------- actualizaciones del programa ----------------
+   El servidor mira solo si hay una versión nueva publicada. Aquí solo se
+   pinta el estado y se deja el botón por si se quiere forzar. */
+async function pintarEstadoUpd(ov){
+  const caja = ov.querySelector('#c-upd-caja');
+  if(!caja) return;
+  try{
+    const a = await api('/api/actualizacion');
+    let t = `Versión instalada: <b>${esc(a.version)}</b>`;
+    if(a.hay) t += ` &nbsp;·&nbsp; <span style="color:#C25705;font-weight:700">hay la ${esc(a.nueva)} disponible</span>`;
+    else if(a.revisado) t += ' &nbsp;·&nbsp; <span class="hint">está al día</span>';
+    if(!a.instalable) t += '<div class="hint">Se está ejecutando desde el código, no desde el programa instalado: aquí no se actualiza solo.</div>';
+    if(a.error) t += `<div class="hint" style="color:#B3261E">${esc(a.error)}</div>`;
+    caja.innerHTML = t;
+    const b = ov.querySelector('#c-upd-inst');
+    if(b) b.style.display = (a.hay && a.instalable) ? '' : 'none';
+  }catch(e){ caja.textContent = 'Versión instalada: —'; }
+}
+
+async function buscarActualizacion(btn){
+  const ov = btn.closest('.overlay'), msg = ov.querySelector('#c-upd-msg');
+  btn.disabled = true; msg.style.color = ''; msg.textContent = 'Consultando…';
+  try{
+    const a = await api('/api/actualizacion/buscar', {});
+    msg.style.color = a.hay ? '#C25705' : '#1F7A44';
+    msg.textContent = a.hay ? `hay la ${a.nueva}` : 'ya tienes la última';
+    await pintarEstadoUpd(ov);
+  }catch(e){ msg.style.color = '#B3261E'; msg.textContent = '✖ ' + e.message; }
+  btn.disabled = false;
+}
+
+function instalarActualizacion(btn){
+  const ov = btn.closest('.overlay');
+  modal('⬇️ Instalar la versión nueva', `
+    <p>Se descarga la versión nueva y el programa <b>se reinicia solo</b>. Tarda menos de un minuto.</p>
+    <div style="background:#FDF6E3;border:1px solid #E8D9A0;border-radius:6px;padding:10px;line-height:1.5">
+      ⚠️ Durante el reinicio la pistola y los otros PCs se quedan <b>unos segundos sin servidor</b>.
+      Mejor no hacerlo en mitad de un conteo.
+    </div>
+    <div class="hint" style="margin-top:8px">Antes se guarda copia del inventario, y la versión
+    de ahora queda guardada al lado por si hubiera que volver atrás.</div>`,
+    [{t:'Ahora no'}, {t:'Sí, actualizar', p:1, f:async (ov2, b2) => {
+      b2.disabled = true; b2.textContent = 'Actualizando…';
+      try{
+        const j = await api('/api/actualizacion/instalar', {});
+        ov2.remove(); if(ov) ov.remove();
+        esperandoReinicio(j.instalada);
+      }catch(e){
+        b2.disabled = false; b2.textContent = 'Sí, actualizar';
+        toast('✖ ' + e.message);
+      } }}]);
+}
+
+/* Mientras el servidor se reinicia, se espera y se recarga sola la pantalla. */
+function esperandoReinicio(nueva){
+  const ov = modal('⬇️ Actualizando el programa', `
+    <p>Instalando la versión <b>${esc(nueva || 'nueva')}</b>. El servidor se está reiniciando…</p>
+    <div class="hint">Esta pantalla se recarga sola en cuanto vuelva. No cierres la ventana.</div>`, []);
+  let intentos = 0;
+  const t = setInterval(async () => {
+    intentos++;
+    try{
+      await api('/api/actualizacion');
+      clearInterval(t); location.reload();
+    }catch(e){
+      if(intentos > 60){                       // ~3 minutos
+        clearInterval(t);
+        ov.querySelector('.m-cuerpo').innerHTML =
+          '<p>El servidor está tardando en volver.</p><div class="hint">Abre otra vez el ' +
+          'programa desde el icono del escritorio. Si no arranca, junto al programa quedó ' +
+          'la versión anterior (ServidorInventarioRFID_v…exe) para volver atrás.</div>';
+      }
+    }
+  }, 3000);
+}
+
+/* Aviso automático: lo trae /api/dashboard cada 10 s. */
+let updVisto = null, updAvisado = false;
+function avisarActualizacion(a){
+  if(!a) return;
+  if(updVisto === null){ updVisto = a.version; }
+  if(a.version !== updVisto){ location.reload(); return; }   // ya se actualizó
+  if(a.estado === 'descargando' || a.estado === 'instalando' || a.estado === 'reiniciando'){
+    if(!updAvisado){ updAvisado = true; esperandoReinicio(a.nueva); }
+    return;
+  }
+  if(a.hay && !updAvisado){
+    updAvisado = true;
+    modal('🆕 Hay una versión nueva', `
+      <p>Está publicada la versión <b>${esc(a.nueva)}</b> (tú tienes la ${esc(a.version)}).</p>
+      ${a.notas ? `<div class="hint" style="white-space:pre-wrap;max-height:190px;overflow:auto;
+         background:#F3F2F1;border-radius:6px;padding:8px;margin-top:6px">${esc(a.notas)}</div>` : ''}
+      <div class="hint" style="margin-top:8px">Si dejas activado «instalarla sola» en
+      ⚙ Configuración, se pondrá al día cuando nadie esté leyendo con la pistola.</div>`,
+      [{t:'Luego'}, {t:'Instalar ahora', p:1, f:(ov3, b3) => {
+        b3.disabled = true; b3.textContent = 'Actualizando…';
+        api('/api/actualizacion/instalar', {})
+          .then(j => { ov3.remove(); esperandoReinicio(j.instalada); })
+          .catch(e => { b3.disabled = false; b3.textContent = 'Instalar ahora'; toast('✖ ' + e.message); });
+      }}]);
+  }
+}
+
 async function stats(){
   try{
     const j = await api('/api/dashboard');
     avisarRespaldo(j.respaldo);
+    avisarActualizacion(j.actualizacion);
     document.getElementById('b-der').textContent =
       `${fmt(j.productos)} productos · ${fmt(j.tags)} etiquetas` +
       (j.sesion ? ` · sesión abierta: ${j.sesion.nombre}` : '') +

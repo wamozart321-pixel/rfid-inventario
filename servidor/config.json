@@ -1,5 +1,5 @@
 {
-  "impresora_ip": "192.168.0.14",
+  "impresora_ip": "192.168.0.29",
   "impresora_puerto": 9100,
   "dpi": 203,
   "etiqueta_ancho_mm": 50.0,
@@ -110,7 +110,7 @@
       "letra": "ancha"
     }
   },
-  "sat_ip": "192.168.0.18",
+  "sat_ip": "192.168.0.32",
   "sat_puerto": 9100,
   "sat_dpi": 203,
   "sat_ancho_mm": 50.0,
@@ -120,11 +120,14 @@
   "sat_oscuridad": 8,
   "sat_papel_tipo": "gap",
   "sat_impresora_win": "SAT TT448-2 USE",
+  "rotacion_dias": 180,
+  "rotacion_alta": 10,
+  "rotacion_media": 3,
   "sat_doble": true,
   "sat_sep_mm": 3.9,
   "sat_lado": "ambas",
   "respaldo_activo": true,
-  "respaldo_hora": "05:20",
+  "respaldo_hora": "17:20",
   "respaldo_carpeta": "",
   "respaldo_dias": 30,
   "costo_descuento": 48,

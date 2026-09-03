@@ -29,3 +29,7 @@ servidor/respaldos/
 Thumbs.db
 desktop.ini
 ~$*
+
+# Paginas web guardadas a mano (pueden traer datos personales)
+conversacion.html
+*-guardado.html

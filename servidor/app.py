@@ -35,6 +35,10 @@ DEFAULT_CFG = {
     # con separación · marca = marca negra · continuo = papel continuo
     "papel_tipo": "",
     "zebra_impresora_win": "",   # nombre en Windows (para el botón Avanzado)
+    # Cómo se le manda a la Zebra: "red" = directo a su IP (puerto 9100) ·
+    # "windows" = a la impresora instalada en Windows (sirve por USB y por red,
+    # y así no hay que perseguir la IP cuando el router se la cambia).
+    "zebra_salida": "red",
     "nombre_empresa": "MI EMPRESA",
     # Integración BarTender: imprime con el diseño .btw original en vez del ZPL propio
     "bartender": False,
@@ -54,6 +58,7 @@ DEFAULT_CFG = {
     "sat_oscuridad": 12,         # 0-15
     "sat_papel_tipo": "",        # "" / gap / marca / continuo
     "sat_impresora_win": "",     # nombre en Windows (para el botón Avanzado)
+    "sat_salida": "red",         # "red" (IP) o "windows" (USB o driver instalado)
     # SEMÁFORO DE ROTACIÓN: unidades VENDIDAS en los últimos N días.
     #   verde  = alta rotación (se vende mucho)
     #   ámbar  = media
@@ -65,6 +70,11 @@ DEFAULT_CFG = {
     "sat_sep_mm": 4,             # separación horizontal entre las dos etiquetas
     "sat_lado": "izquierda",     # cuál de las dos usar: izquierda / derecha
     # Copia de seguridad automática de la base de datos cada día a una hora
+    # Actualizaciones: el programa se pone al dia solo cuando se publica
+    # una version nueva (nadie tiene que reinstalar nada a mano).
+    "actualizar_revisar": True,   # mirar cada pocas horas si hay version nueva
+    "actualizar_auto": True,      # ademas de mirar, instalarla sola
+    "actualizar_repo": "",        # vacio = el repositorio de siempre
     "respaldo_activo": True,
     "respaldo_hora": "05:20",    # HH:MM (24h)
     "respaldo_carpeta": "",      # vacío = carpeta 'respaldos' junto al programa
@@ -141,6 +151,33 @@ def init_db():
         cantidad INTEGER DEFAULT 0,
         posicion TEXT DEFAULT '',
         PRIMARY KEY(producto_id, bodega));
+    -- BALIZAS: etiquetas fijas pegadas al estante que dicen DÓNDE está la
+    -- pistola. Al leer una, todo lo que venga después se apunta en ese sitio.
+    CREATE TABLE IF NOT EXISTS balizas(
+        epc TEXT PRIMARY KEY,
+        bodega TEXT NOT NULL DEFAULT '',
+        posicion TEXT NOT NULL DEFAULT '',
+        nota TEXT DEFAULT '',
+        creada TEXT);
+    -- Cuántas VECES se vio cada producto en cada sitio. Se cuenta repetido a
+    -- propósito: el sitio con más lecturas gana, y así el eco del pasillo de
+    -- al lado (que se lee pocas veces) no manda sobre el estante de verdad.
+    CREATE TABLE IF NOT EXISTS detecciones_pos(
+        sesion_id INTEGER,
+        epc TEXT,
+        bodega TEXT,
+        posicion TEXT,
+        veces INTEGER DEFAULT 0,
+        ultima TEXT,
+        PRIMARY KEY(sesion_id, epc, bodega, posicion));
+    CREATE INDEX IF NOT EXISTS idx_detpos_ses ON detecciones_pos(sesion_id);
+    -- Dónde está ahora mismo cada pistola (la última baliza que leyó).
+    CREATE TABLE IF NOT EXISTS dispositivo_pos(
+        dispositivo TEXT PRIMARY KEY,
+        bodega TEXT DEFAULT '',
+        posicion TEXT DEFAULT '',
+        epc_baliza TEXT DEFAULT '',
+        ts TEXT);
     """)
     try:
         # posición dentro de la bodega (estante/casilla: A1, F6, CJ4…)
@@ -988,7 +1025,84 @@ def abrir_preferencias_impresora(nombre):
     (la misma de Panel de control), sin bloquear el servidor."""
     subprocess.Popen(["rundll32", "printui.dll,PrintUIEntry", "/e", "/n", nombre])
 
+
+def mandar_windows(nombre, datos):
+    """Manda los datos EN CRUDO (ZPL o TSPL) a una impresora instalada en
+    Windows. Da igual si está por USB o por red: de la conexión se encarga
+    Windows, así no hay que perseguir la IP cuando el router se la cambia.
+
+    Se usa la API del spooler con ctypes a propósito: así no hace falta
+    instalar pywin32 ni añadir nada al .exe."""
+    if os.name != "nt":
+        raise OSError("imprimir por Windows solo funciona en Windows")
+    nombre = str(nombre or "").strip()
+    if not nombre:
+        raise OSError("no se ha elegido la impresora de Windows")
+    if not isinstance(datos, (bytes, bytearray)):
+        datos = str(datos).encode("utf-8")
+    datos = bytes(datos)
+
+    import ctypes
+    from ctypes import wintypes
+
+    ws = ctypes.WinDLL("winspool.drv", use_last_error=True)
+
+    class DOC_INFO_1(ctypes.Structure):
+        _fields_ = [("pDocName", wintypes.LPWSTR),
+                    ("pOutputFile", wintypes.LPWSTR),
+                    ("pDatatype", wintypes.LPWSTR)]
+
+    ws.OpenPrinterW.argtypes = [wintypes.LPWSTR, ctypes.POINTER(wintypes.HANDLE),
+                                ctypes.c_void_p]
+    ws.StartDocPrinterW.argtypes = [wintypes.HANDLE, wintypes.DWORD,
+                                    ctypes.POINTER(DOC_INFO_1)]
+    ws.StartPagePrinter.argtypes = [wintypes.HANDLE]
+    ws.WritePrinter.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                                ctypes.POINTER(wintypes.DWORD)]
+    ws.EndPagePrinter.argtypes = [wintypes.HANDLE]
+    ws.EndDocPrinter.argtypes = [wintypes.HANDLE]
+    ws.ClosePrinter.argtypes = [wintypes.HANDLE]
+
+    h = wintypes.HANDLE()
+    if not ws.OpenPrinterW(nombre, ctypes.byref(h), None):
+        raise OSError("Windows no encuentra la impresora «%s» (error %d). "
+                      "Revisa que el nombre sea exacto en ⚙ Configuración."
+                      % (nombre, ctypes.get_last_error()))
+    try:
+        doc = DOC_INFO_1("Inventario RFID", None, "RAW")
+        if not ws.StartDocPrinterW(h, 1, ctypes.byref(doc)):
+            raise OSError("Windows no aceptó el trabajo para «%s» (error %d)"
+                          % (nombre, ctypes.get_last_error()))
+        try:
+            ws.StartPagePrinter(h)
+            escritos = wintypes.DWORD(0)
+            if not ws.WritePrinter(h, datos, len(datos), ctypes.byref(escritos)):
+                raise OSError("no se pudieron enviar los datos a «%s» (error %d)"
+                              % (nombre, ctypes.get_last_error()))
+            if escritos.value != len(datos):
+                raise OSError("la impresora «%s» solo aceptó %d de %d bytes"
+                              % (nombre, escritos.value, len(datos)))
+            ws.EndPagePrinter(h)
+        finally:
+            ws.EndDocPrinter(h)
+    finally:
+        ws.ClosePrinter(h)
+
+
+def salida_windows(c, cual):
+    """Devuelve el nombre de la impresora de Windows si esa impresora está
+    configurada para imprimir POR WINDOWS; si no, cadena vacía (= por red)."""
+    pre = "sat" if cual == "sat" else "zebra"
+    if str(c.get(pre + "_salida") or "red").lower() != "windows":
+        return ""
+    return str(c.get(pre + "_impresora_win") or "").strip()
+
+
 def enviar_zpl(zpl, c):
+    win = salida_windows(c, "zebra")
+    if win:
+        mandar_windows(win, zpl)
+        return
     try:
         _mandar_zpl(zpl, c["impresora_ip"], c["impresora_puerto"])
         return
@@ -1165,6 +1279,47 @@ def datos_sat_img(img, c, copias=1):
                         for x in xs_dots)
     return cab + bitmaps + f"\r\nPRINT {copias},1\r\n".encode("ascii")
 
+def datos_prueba(c, tipo, ruta):
+    """Etiqueta de PRUEBA corta, en el lenguaje de cada impresora. Lleva escrito
+    por dónde salió, para que se vea de un vistazo si la ruta es la buena."""
+    if tipo == "zebra":
+        dpi = int(c.get("dpi") or 203)
+        w = mm_a_dots(float(c.get("etiqueta_ancho_mm") or 50), dpi)
+        h = mm_a_dots(float(c.get("etiqueta_alto_mm") or 39), dpi)
+        g, p = int(h * 0.20), int(h * 0.10)
+        return "\n".join([
+            "^XA", f"^PW{w}", f"^LL{h}",
+            f"^FO0,{int(h*0.16)}^A0N,{g},{g}^FB{w},1,0,C^FDPRUEBA ZEBRA^FS",
+            f"^FO0,{int(h*0.48)}^A0N,{p},{p}^FB{w},2,3,C^FD{texto_zebra(ruta)}^FS",
+            "^PQ1", "^XZ"])
+    # SAT: se declara el ancho TOTAL (rollo doble incluido), como al imprimir
+    dpi = int(c.get("sat_dpi") or 203)
+    ancho = float(c.get("sat_ancho_mm") or 50)
+    alto = float(c.get("sat_alto_mm") or 40)
+    total = ancho * 2 + float(c.get("sat_sep_mm") or 4) if c.get("sat_doble") else ancho
+    osc = max(0, min(15, int(c.get("sat_oscuridad", 12))))
+    papel = str(c.get("sat_papel_tipo") or "")
+    if str(c.get("sat_lenguaje") or "tspl").lower() == "zpl":
+        w, h = mm_a_dots(total, dpi), mm_a_dots(alto, dpi)
+        mn = {"gap": "^MNY", "marca": "^MNM", "continuo": "^MNN"}.get(papel, "")
+        g, p = int(h * 0.20), int(h * 0.10)
+        return "\n".join([
+            "^XA", f"^PW{w}", f"^LL{h}", mn,
+            f"^FO0,{int(h*0.16)}^A0N,{g},{g}^FB{w},1,0,C^FDPRUEBA SAT (ZPL)^FS",
+            f"^FO0,{int(h*0.48)}^A0N,{p},{p}^FB{w},2,3,C^FD{texto_zebra(ruta)}^FS",
+            "^PQ1", "^XZ"])
+    gap = float(c.get("sat_gap_mm") or 3)
+    linea_papel = (f"BLINE {gap:g} mm,0" if papel == "marca"
+                   else "GAP 0,0" if papel == "continuo" else f"GAP {gap:g} mm,0")
+    return "\r\n".join([
+        f"SIZE {total:g} mm,{alto:g} mm", linea_papel,
+        "DIRECTION 1", "REFERENCE 0,0", f"DENSITY {osc}", "CLS",
+        'TEXT 24,30,"4",0,1,1,"PRUEBA SAT (TSPL)"',
+        'TEXT 24,95,"2",0,1,1,"%s"' % texto_zebra(ruta),
+        'TEXT 24,135,"2",0,1,1,"si lees esto, la impresora quedo bien"',
+        "PRINT 1,1", ""])
+
+
 def datos_descripcion(p, c, copias=1):
     """Etiqueta de DESCRIPCIÓN para la SAT (imagen)."""
     return datos_sat_img(img_descripcion(p, c), c, copias)
@@ -1175,9 +1330,14 @@ def datos_codigo_sat(p, c, copias=1):
     return datos_sat_img(img_descripcion(p, c, diseno=diseno_cfg(c)), c, copias)
 
 def enviar_descripcion(datos, c):
+    win = salida_windows(c, "sat")
+    if win:
+        mandar_windows(win, datos)
+        return
     ip = str(c.get("sat_ip") or "").strip()
     if not ip:
-        raise OSError("primero pon la IP de la impresora SAT en ⚙ Configuración")
+        raise OSError("primero pon la IP de la impresora SAT en ⚙ Configuración "
+                      "(o cámbiala a «por Windows»)")
     _mandar_zpl(datos, ip, int(c.get("sat_puerto") or 9100))
 
 def zpl_descripcion(p, epc, c):
@@ -1229,25 +1389,160 @@ def decodificar_epc(d, epc):
             pass
     return None
 
+
+EPC_BALIZA = "AF02"   # prefijo de las BALIZAS de posición (no son repuestos)
+
+
+def partir_posicion(posicion):
+    """«B12» -> ("B", 12).  Devuelve (None, None) si no tiene esa forma."""
+    m = re.match(r"^([A-Z])\s*(\d{1,2})$", str(posicion or "").strip().upper())
+    return (m.group(1), int(m.group(2))) if m else (None, None)
+
+
+def nuevo_epc_baliza(d, posicion):
+    """EPC de 24 hex para una baliza: AF02 + letra (2 hex) + número (2 hex) +
+    16 al azar. La posición va DENTRO del número, así una baliza se reconoce
+    aunque se pierda la base de datos."""
+    letra, num = partir_posicion(posicion)
+    cab = EPC_BALIZA + ("%02X" % (ord(letra) - 64) if letra else "00") \
+                     + ("%02X" % min(num or 0, 255))
+    while True:
+        epc = cab + secrets.token_hex(8).upper()
+        if not d.execute("SELECT 1 FROM balizas WHERE epc=?", (epc,)).fetchone() \
+           and not d.execute("SELECT 1 FROM tags WHERE epc=?", (epc,)).fetchone():
+            return epc
+
+
+def decodificar_baliza(epc):
+    """Si el EPC es de una baliza (AF02...), regresa «B12». Red de seguridad
+    para reconocerla aunque no esté dada de alta."""
+    if len(epc) == 24 and epc.startswith(EPC_BALIZA):
+        try:
+            l, n = int(epc[4:6], 16), int(epc[6:8], 16)
+            if 1 <= l <= 26 and n:
+                return "%s%d" % (chr(64 + l), n)
+        except ValueError:
+            pass
+    return None
+
+
+def texto_zebra(s):
+    """Quita acentos SIN cambiar mayúsculas: la Zebra no los dibuja bien con la
+    tabla de caracteres por defecto. (Ojo: no confundir con _sin_tildes, que es
+    la del buscador y sí pasa todo a minúsculas.)"""
+    tabla = str.maketrans("ÁÉÍÓÚÜÑáéíóúüñ", "AEIOUUNaeiouun")
+    return str(s or "").translate(tabla)
+
+
+def zpl_baliza(bodega, posicion, epc, c):
+    """Etiqueta de BALIZA: la posición enorme para pegarla sin equivocarse, y
+    el EPC grabado en el chip (solo la ZT411R sabe grabar)."""
+    w = mm_a_dots(float(c.get("etiqueta_ancho_mm") or 100), c["dpi"])
+    h = mm_a_dots(float(c.get("etiqueta_alto_mm") or 50), c["dpi"])
+    z = [f"~SD{max(0, min(30, int(c.get('oscuridad', 27)))):02d}",
+         "^XA", f"^PW{w}", f"^LL{h}",
+         f"^PR{max(2, min(7, int(c.get('velocidad', 3))))}"]
+    mn = {"gap": "^MNY", "marca": "^MNM", "continuo": "^MNN"}.get(
+        str(c.get("papel_tipo") or ""), "")
+    if mn:
+        z.append(mn)
+    if c.get("codificar_rfid") and epc:
+        z += ["^RS8", f"^RFW,H,,,A^FD{epc}^FS"]      # graba el EPC (solo ZT411R)
+    s_bod, s_pos, s_pie = int(h * 0.15), int(h * 0.46), int(h * 0.085)
+    z += [
+        f"^FO6,6^GB{w-12},{h-12},3^FS",
+        f"^FO0,{int(h*0.10)}^A0N,{s_bod},{s_bod}^FB{w},1,0,C^FD{texto_zebra(bodega)}^FS",
+        f"^FO0,{int(h*0.30)}^A0N,{s_pos},{s_pos}^FB{w},1,0,C^FD{texto_zebra(posicion)}^FS",
+        f"^FO0,{int(h*0.83)}^A0N,{s_pie},{s_pie}^FB{w},1,0,C^FDBALIZA DE POSICION - NO QUITAR^FS",
+        "^PQ1", "^XZ"]
+    return "\n".join(z)
+
+# ------------------------------------------------------------------- BALIZAS
+# Una baliza es una etiqueta RFID fija pegada al estante que no es un repuesto:
+# sirve para saber DÓNDE está la pistola. Cuando lee la baliza de «BODEGA 8 /
+# B-12», todo lo que lea a continuación se apunta como visto en ese sitio.
+BALIZA_MINUTOS = 10          # si la última baliza es más vieja, ya no vale
+
+
+def balizas_mapa(d):
+    """EPC -> (bodega, posición) de todas las balizas."""
+    return {r["epc"]: (r["bodega"], r["posicion"])
+            for r in d.execute("SELECT epc, bodega, posicion FROM balizas")}
+
+
+def pos_dispositivo(d, dispositivo, minutos=BALIZA_MINUTOS):
+    """Dónde está esa pistola ahora. Si hace rato que no lee una baliza se
+    devuelve vacío: es preferible no saber dónde está a inventárselo."""
+    r = d.execute("SELECT bodega, posicion, ts FROM dispositivo_pos WHERE dispositivo=?",
+                  (dispositivo,)).fetchone()
+    if not r or not r["posicion"]:
+        return ("", "")
+    try:
+        if datetime.now() - datetime.fromisoformat(r["ts"]) > timedelta(minutes=minutos):
+            return ("", "")
+    except (TypeError, ValueError):
+        return ("", "")
+    return (r["bodega"], r["posicion"])
+
+
+def marcar_baliza(d, dispositivo, epc, bodega, posicion):
+    d.execute("""INSERT INTO dispositivo_pos(dispositivo,bodega,posicion,epc_baliza,ts)
+                 VALUES(?,?,?,?,?)
+                 ON CONFLICT(dispositivo) DO UPDATE SET
+                   bodega=excluded.bodega, posicion=excluded.posicion,
+                   epc_baliza=excluded.epc_baliza, ts=excluded.ts""",
+              (dispositivo, bodega, posicion, epc, datetime.now().isoformat()))
+
+
+def anotar_deteccion(d, sesion_id, epc, bodega, posicion):
+    """Suma UNA lectura de ese EPC en ese sitio. Se cuenta repetido a propósito:
+    manda el sitio donde más veces se vio."""
+    d.execute("""INSERT INTO detecciones_pos(sesion_id,epc,bodega,posicion,veces,ultima)
+                 VALUES(?,?,?,?,1,?)
+                 ON CONFLICT(sesion_id,epc,bodega,posicion) DO UPDATE SET
+                   veces = veces + 1, ultima = excluded.ultima""",
+              (sesion_id, epc, bodega, posicion, datetime.now().isoformat()))
+
+
 # ---------------------------------------------------------------- API (pistolas)
 @app.post("/api/lecturas")
 def api_lecturas():
-    """JSON: {"dispositivo":"C72-01", "epcs":["E28011...", ...], "sesion_id": opcional}"""
+    """JSON: {"dispositivo":"C72-01", "epcs":["E28011...", ...], "sesion_id": opcional}
+
+    Los EPCs se procesan EN ORDEN: si uno es una baliza, cambia el sitio en el
+    que se apunta todo lo que venga detrás."""
+    global ULTIMA_LECTURA
     d = db(); data = request.get_json(force=True)
     epcs = [e.strip().upper() for e in data.get("epcs", []) if e.strip()]
+    disp = data.get("dispositivo", "?")
+    ULTIMA_LECTURA = datetime.now()   # no se actualiza a mitad de un conteo
     ses = None
     if data.get("sesion_id"):
         ses = d.execute("SELECT * FROM sesiones WHERE id=?", (data["sesion_id"],)).fetchone()
     if not ses:
         ses = sesion_activa(d) or crear_sesion(d, "Auto " + datetime.now().strftime("%Y-%m-%d %H:%M"))
-    nuevos = 0
+    balizas = balizas_mapa(d)
+    bodega, posicion = pos_dispositivo(d, disp)
+    nuevos = balizas_vistas = 0
     for e in epcs:
+        # ¿es una baliza? entonces no es un repuesto: solo mueve el «dónde»
+        if e in balizas:
+            bodega, posicion = balizas[e]
+            marcar_baliza(d, disp, e, bodega, posicion)
+            balizas_vistas += 1
+            continue
+        if decodificar_baliza(e):
+            # baliza impresa por nosotros que ya no está dada de alta: no es un
+            # repuesto, así que se ignora en vez de ensuciar el conteo
+            continue
         try:
             d.execute("INSERT INTO lecturas(sesion_id,epc,dispositivo,ts) VALUES(?,?,?,?)",
-                      (ses["id"], e, data.get("dispositivo", "?"), datetime.now().isoformat()))
+                      (ses["id"], e, disp, datetime.now().isoformat()))
             nuevos += 1
         except sqlite3.IntegrityError:
             pass
+        if posicion:
+            anotar_deteccion(d, ses["id"], e, bodega, posicion)
         # Red de seguridad: EPC con nuestra marca (AF01) sin asociar -> se
         # asocia solo al producto codificado dentro del número.
         if not d.execute("SELECT 1 FROM tags WHERE epc=?", (e,)).fetchone():
@@ -1256,7 +1551,9 @@ def api_lecturas():
                 d.execute("INSERT OR REPLACE INTO tags(epc,producto_id,creado) VALUES(?,?,?)",
                           (e, pid, datetime.now().isoformat()))
     d.commit()
-    return jsonify(ok=True, sesion_id=ses["id"], recibidos=len(epcs), nuevos=nuevos)
+    return jsonify(ok=True, sesion_id=ses["id"], recibidos=len(epcs), nuevos=nuevos,
+                   balizas=balizas_vistas, bodega=bodega, posicion=posicion,
+                   sitio=(f"{bodega} / {posicion}" if posicion else ""))
 
 @app.post("/api/tags")
 def api_tags():
@@ -1308,16 +1605,247 @@ def api_tags_todos():
         "SELECT id, sku, nombre FROM productos").fetchall()}
     ign = [r["epc"] for r in d.execute(
         "SELECT epc FROM tags WHERE producto_id IS NULL").fetchall()]
-    return jsonify(marca=EPC_MARCA, tags=tags, productos=prods, ignorados=ign)
+    # las balizas van aparte para que la pistola pueda enseñar «📍 BODEGA 8 /
+    # B-12» en vez de tratarlas como una etiqueta desconocida
+    bal = {r["epc"]: [r["bodega"], r["posicion"]] for r in d.execute(
+        "SELECT epc, bodega, posicion FROM balizas").fetchall()}
+    return jsonify(marca=EPC_MARCA, tags=tags, productos=prods, ignorados=ign,
+                   balizas=bal)
 
 @app.get("/api/desconocidos")
 def api_desconocidos():
-    """Lista de EPCs leídos sin producto, para la pistola."""
+    """Lista de EPCs leídos sin producto, para la pistola.
+    Las balizas se excluyen: son etiquetas nuestras, no repuestos perdidos."""
     d = db()
     rows = d.execute("""SELECT epc, COUNT(*) veces, MAX(ts) ultima FROM lecturas
         WHERE epc NOT IN (SELECT epc FROM tags)
+          AND epc NOT IN (SELECT epc FROM balizas)
         GROUP BY epc ORDER BY ultima DESC LIMIT 200""").fetchall()
     return jsonify([dict(r) for r in rows])
+
+def _norm_baliza(data):
+    """Limpia y valida lo que viene del formulario de balizas."""
+    epc = str(data.get("epc", "")).strip().upper()
+    bodega = str(data.get("bodega", "")).strip().upper()
+    posicion = str(data.get("posicion", "")).strip().upper()
+    nota = str(data.get("nota", "")).strip()
+    return epc, bodega, posicion, nota
+
+
+@app.get("/api/balizas")
+def api_balizas():
+    """Balizas dadas de alta, con cuántas lecturas ha situado cada una."""
+    d = db()
+    rows = d.execute("""
+        SELECT b.epc, b.bodega, b.posicion, b.nota, b.creada,
+               (SELECT IFNULL(SUM(veces),0) FROM detecciones_pos dp
+                 WHERE dp.bodega=b.bodega AND dp.posicion=b.posicion) situadas
+        FROM balizas b ORDER BY b.bodega, b.posicion""").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.get("/api/balizas/pistolas")
+def api_balizas_pistolas():
+    """Dónde está cada pistola según la última baliza que leyó. Sirve para
+    comprobar de un vistazo si la pistola está viendo las balizas o no."""
+    d = db()
+    out = []
+    for r in d.execute("SELECT * FROM dispositivo_pos ORDER BY ts DESC"):
+        try:
+            mins = int((datetime.now() - datetime.fromisoformat(r["ts"])).total_seconds() // 60)
+        except (TypeError, ValueError):
+            mins = 9999
+        out.append({"dispositivo": r["dispositivo"], "bodega": r["bodega"],
+                    "posicion": r["posicion"], "minutos": mins,
+                    "vigente": mins < BALIZA_MINUTOS})
+    return jsonify(out)
+
+
+@app.post("/api/balizas")
+def api_balizas_guardar():
+    """JSON: {epc, bodega, posicion, nota}. Da de alta o corrige una baliza."""
+    d = db()
+    epc, bodega, posicion, nota = _norm_baliza(request.get_json(force=True))
+    if not epc:
+        return jsonify(ok=False, error="Falta el número de la etiqueta (EPC)"), 400
+    if not bodega or not posicion:
+        return jsonify(ok=False, error="Hay que decir la bodega y la posición"), 400
+    if d.execute("SELECT 1 FROM tags WHERE epc=? AND producto_id IS NOT NULL",
+                 (epc,)).fetchone():
+        return jsonify(ok=False, error="Esa etiqueta ya está puesta en un repuesto. "
+                                       "Usa una etiqueta nueva para la baliza."), 409
+    d.execute("""INSERT INTO balizas(epc,bodega,posicion,nota,creada) VALUES(?,?,?,?,?)
+                 ON CONFLICT(epc) DO UPDATE SET
+                   bodega=excluded.bodega, posicion=excluded.posicion, nota=excluded.nota""",
+              (epc, bodega, posicion, nota, datetime.now().isoformat()))
+    d.commit()
+    return jsonify(ok=True, epc=epc, sitio=f"{bodega} / {posicion}")
+
+
+@app.post("/api/balizas/borrar")
+def api_balizas_borrar():
+    """JSON: {epc}. Quita la baliza (las detecciones ya hechas se conservan)."""
+    d = db()
+    epc = str(request.get_json(force=True).get("epc", "")).strip().upper()
+    if not d.execute("SELECT 1 FROM balizas WHERE epc=?", (epc,)).fetchone():
+        return jsonify(ok=False, error="Esa baliza no existe"), 404
+    d.execute("DELETE FROM balizas WHERE epc=?", (epc,))
+    d.execute("DELETE FROM dispositivo_pos WHERE epc_baliza=?", (epc,))
+    d.commit()
+    return jsonify(ok=True)
+
+
+@app.get("/api/balizas/propuestas")
+def api_balizas_propuestas():
+    """?sesion_id= (o la sesión abierta) -> cambios de posición SUGERIDOS.
+
+    Para cada producto gana el sitio donde más veces se leyó. Nunca se toca la
+    base aquí: esto solo propone, y hay que confirmar en pantalla."""
+    d = db()
+    sid = request.args.get("sesion_id", type=int)
+    if not sid:
+        s = sesion_activa(d)
+        sid = s["id"] if s else 0
+    # Un mismo repuesto puede llevar VARIAS etiquetas (una por unidad), así que
+    # se suman todas las suyas: si no, cada etiqueta parecería un sitio distinto
+    # y la seguridad saldría ridículamente baja.
+    filas = d.execute("""
+        SELECT p.id producto_id, p.sku, p.nombre, dp.bodega, dp.posicion,
+               SUM(dp.veces) veces, IFNULL(sb.posicion,'') actual,
+               (sb.producto_id IS NOT NULL) en_bodega
+        FROM detecciones_pos dp
+        JOIN tags t ON t.epc = dp.epc
+        JOIN productos p ON p.id = t.producto_id
+        LEFT JOIN stock_bodegas sb ON sb.producto_id = p.id AND sb.bodega = dp.bodega
+        WHERE dp.sesion_id = ?
+        GROUP BY p.id, dp.bodega, dp.posicion
+        ORDER BY p.id, SUM(dp.veces) DESC""", (sid,)).fetchall()
+    # el sitio con más lecturas gana; se guarda el segundo para poder avisar
+    mejor = {}
+    for f in filas:
+        k = (f["producto_id"], f["bodega"])
+        if k not in mejor:
+            mejor[k] = {"producto_id": f["producto_id"], "sku": f["sku"],
+                        "nombre": f["nombre"], "bodega": f["bodega"],
+                        "posicion": f["posicion"], "veces": f["veces"],
+                        "actual": f["actual"], "en_bodega": bool(f["en_bodega"]),
+                        "otras": []}
+        else:
+            mejor[k]["otras"].append({"posicion": f["posicion"], "veces": f["veces"]})
+    out = []
+    for m in mejor.values():
+        total = m["veces"] + sum(o["veces"] for o in m["otras"])
+        m["confianza"] = round(100.0 * m["veces"] / total) if total else 0
+        m["cambia"] = (m["posicion"] != m["actual"])
+        out.append(m)
+    out.sort(key=lambda m: (not m["cambia"], -m["veces"]))
+    return jsonify(sesion_id=sid, propuestas=out)
+
+
+@app.post("/api/balizas/aplicar")
+def api_balizas_aplicar():
+    """JSON: {cambios:[{producto_id, bodega, posicion}, ...]}
+    Escribe las posiciones aceptadas. Solo llega aquí lo que se confirmó."""
+    d = db()
+    cambios = request.get_json(force=True).get("cambios", [])
+    hechos = 0
+    for c in cambios:
+        try:
+            pid = int(c["producto_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        bodega = str(c.get("bodega", "")).strip().upper()
+        posicion = str(c.get("posicion", "")).strip().upper()
+        if not bodega or not posicion:
+            continue
+        if not d.execute("SELECT 1 FROM productos WHERE id=?", (pid,)).fetchone():
+            continue
+        d.execute("""INSERT INTO stock_bodegas(producto_id,bodega,cantidad,posicion)
+                     VALUES(?,?,0,?)
+                     ON CONFLICT(producto_id,bodega) DO UPDATE SET posicion=excluded.posicion""",
+                  (pid, bodega, posicion))
+        hechos += 1
+    d.commit()
+    return jsonify(ok=True, aplicados=hechos)
+
+
+MAX_BALIZAS_LOTE = 300     # tope de seguridad: evita gastar un rollo por un clic
+
+
+def _rango_letras(desde, hasta):
+    a, b = (str(desde or "A").strip().upper() or "A")[0], (str(hasta or "A").strip().upper() or "A")[0]
+    if not ("A" <= a <= "Z" and "A" <= b <= "Z"):
+        return []
+    if a > b:
+        a, b = b, a
+    return [chr(x) for x in range(ord(a), ord(b) + 1)]
+
+
+@app.post("/api/balizas/imprimir")
+def api_balizas_imprimir():
+    """JSON: {bodega, desde_letra:"A", hasta_letra:"F", desde_num:1, hasta_num:10,
+              solo_ver: true|false}
+
+    Genera una baliza por cada casilla (A1, A2… F10), le inventa el EPC, la da
+    de alta y la manda a la Zebra grabando el chip. Si una casilla YA tiene
+    baliza se reimprime con SU MISMO EPC (así se reemplaza una etiqueta rota
+    sin que la vieja deje de valer)."""
+    d = db(); data = request.get_json(force=True)
+    bodega = str(data.get("bodega", "")).strip().upper()
+    if not bodega:
+        return jsonify(ok=False, error="Falta la bodega"), 400
+    letras = _rango_letras(data.get("desde_letra"), data.get("hasta_letra"))
+    if not letras:
+        return jsonify(ok=False, error="Las letras deben ir de la A a la Z"), 400
+    try:
+        n1, n2 = int(data.get("desde_num", 1)), int(data.get("hasta_num", 1))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, error="Los números no son válidos"), 400
+    if n1 > n2:
+        n1, n2 = n2, n1
+    if n1 < 1 or n2 > 99:
+        return jsonify(ok=False, error="Los números van del 1 al 99"), 400
+    total = len(letras) * (n2 - n1 + 1)
+    if total > MAX_BALIZAS_LOTE:
+        return jsonify(ok=False, error=f"Son {total} etiquetas y el tope es "
+                                       f"{MAX_BALIZAS_LOTE}. Hazlo por partes."), 400
+
+    existentes = {r["posicion"]: r["epc"] for r in d.execute(
+        "SELECT posicion, epc FROM balizas WHERE bodega=?", (bodega,))}
+    lote = []
+    for letra in letras:
+        for n in range(n1, n2 + 1):
+            pos = f"{letra}{n}"
+            lote.append({"posicion": pos, "epc": existentes.get(pos, ""),
+                         "reimpresa": pos in existentes})
+
+    if data.get("solo_ver"):
+        return jsonify(ok=True, bodega=bodega, total=total, etiquetas=lote,
+                       nuevas=sum(1 for x in lote if not x["reimpresa"]),
+                       reimpresas=sum(1 for x in lote if x["reimpresa"]))
+
+    c = cfg()
+    hechas, fallo = [], None
+    for x in lote:
+        if not x["epc"]:
+            x["epc"] = nuevo_epc_baliza(d, x["posicion"])
+        try:
+            enviar_zpl(zpl_baliza(bodega, x["posicion"], x["epc"], c), c)
+        except OSError as e:
+            fallo = str(e)
+            break
+        # solo se da de alta lo que la impresora aceptó de verdad
+        d.execute("""INSERT INTO balizas(epc,bodega,posicion,nota,creada) VALUES(?,?,?,'',?)
+                     ON CONFLICT(epc) DO UPDATE SET bodega=excluded.bodega,
+                       posicion=excluded.posicion""",
+                  (x["epc"], bodega, x["posicion"], datetime.now().isoformat()))
+        hechas.append(x)
+    d.commit()
+    if fallo and not hechas:
+        return jsonify(ok=False, error="No respondió la impresora: " + fallo), 502
+    return jsonify(ok=True, bodega=bodega, impresas=len(hechas), etiquetas=hechas,
+                   error=(f"Se cortó tras {len(hechas)} etiquetas: {fallo}" if fallo else ""))
+
 
 @app.post("/api/ignorar")
 def api_ignorar():
@@ -1441,7 +1969,8 @@ def api_dashboard():
             WHERE l.sesion_id=? ORDER BY l.id DESC LIMIT 12""", (s["id"],)).fetchall()]
     return jsonify(productos=tot, tags=tags, leidos=leidos,
                    sesion=(dict(s) if s else None), ultimas=ultimas,
-                   respaldo=ULTIMO_RESPALDO)   # para avisar de la copia diaria
+                   respaldo=ULTIMO_RESPALDO,   # para avisar de la copia diaria
+                   actualizacion=dict(ESTADO_ACTUALIZACION, version=VERSION))
 
 @app.get("/api/sesiones/<int:sid>/resumen")
 def api_resumen(sid):
@@ -2555,6 +3084,45 @@ def api_impresora_buscar():
     return jsonify(ok=True, impresoras=lista, zebras=zebras,
                    actual=c["impresora_ip"], aplicada=aplicada)
 
+@app.get("/api/impresoras_windows")
+def api_impresoras_windows():
+    """Impresoras instaladas en Windows, para elegirlas en ⚙ Configuración."""
+    c = cfg()
+    return jsonify(lista=impresoras_windows(),
+                   zebra=str(c.get("zebra_impresora_win") or ""),
+                   sat=str(c.get("sat_impresora_win") or ""),
+                   zebra_salida=str(c.get("zebra_salida") or "red"),
+                   sat_salida=str(c.get("sat_salida") or "red"))
+
+
+@app.post("/api/impresora/probar")
+def api_impresora_probar():
+    """JSON: {tipo:"zebra"|"sat"} — saca UNA etiqueta de prueba por la ruta que
+    esté configurada (red o Windows), diciendo en la propia etiqueta por dónde
+    salió. Es la forma rápida de saber si quedó bien sin adivinar."""
+    f = request.get_json(silent=True) or {}
+    tipo = "sat" if f.get("tipo") == "sat" else "zebra"
+    c = cfg()
+    win = salida_windows(c, tipo)
+    if win:
+        ruta = "por Windows: " + win
+    elif tipo == "sat":
+        ruta = "por red: %s:%s" % (c.get("sat_ip") or "(sin IP)", c.get("sat_puerto") or 9100)
+    else:
+        ruta = "por red: %s:%s" % (c.get("impresora_ip") or "(sin IP)",
+                                   c.get("impresora_puerto") or 9100)
+    datos = datos_prueba(c, tipo, ruta)
+    try:
+        if tipo == "sat":
+            enviar_descripcion(datos.encode("latin-1", "replace"), c)
+        else:
+            enviar_zpl(datos, c)
+    except OSError as e:
+        return jsonify(ok=False, ruta=ruta, error=str(e)), 502
+    return jsonify(ok=True, ruta=ruta,
+                   msg="Etiqueta de prueba enviada %s" % ruta)
+
+
 @app.post("/api/impresora/avanzado")
 def api_impresora_avanzado():
     """Abre las Preferencias de impresión de Windows (driver) de la Zebra o la
@@ -2723,9 +3291,20 @@ def api_config_guardar():
         c["sat_sep_mm"] = float(c.get("sat_sep_mm") or 4)
         if str(c.get("sat_lado") or "") not in ("izquierda", "derecha", "ambas"):
             c["sat_lado"] = "izquierda"
+        # por dónde sale cada impresora: red (IP) o la instalada en Windows
+        for pre in ("zebra", "sat"):
+            k = pre + "_salida"
+            if str(c.get(k) or "").lower() not in ("red", "windows"):
+                c[k] = "red"
+            # elegir "por Windows" sin decir cuál no tiene sentido: se vuelve a red
+            if c[k] == "windows" and not str(c.get(pre + "_impresora_win") or "").strip():
+                c[k] = "red"
         for kp in ("papel_tipo", "sat_papel_tipo"):
             if str(c.get(kp) or "") not in ("", "gap", "marca", "continuo"):
                 c[kp] = ""
+        c["actualizar_revisar"] = bool(c.get("actualizar_revisar", True))
+        c["actualizar_auto"] = bool(c.get("actualizar_auto", True))
+        c["actualizar_repo"] = str(c.get("actualizar_repo") or "").strip()
         c["respaldo_activo"] = bool(c.get("respaldo_activo", True))
         c["respaldo_dias"] = max(1, min(365, int(c.get("respaldo_dias", 30))))
         c["costo_descuento"] = max(0, min(100, int(c.get("costo_descuento", 48))))
@@ -3359,6 +3938,218 @@ def iniciar_respaldos():
         _respaldo_iniciado = True
         threading.Thread(target=bucle_respaldo, daemon=True).start()
 
+# ---------------------------------------------------------------- actualizaciones
+# El programa mira solo si hay una versión nueva publicada en el repositorio y,
+# si está activado, se actualiza y se reinicia sin que nadie haga nada.
+VERSION = "2.1"
+REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
+NOMBRE_EXE = "ServidorInventarioRFID.exe"
+HORAS_ENTRE_REVISIONES = 6
+# lo último que se sabe de las actualizaciones (lo lee la pantalla para avisar)
+ESTADO_ACTUALIZACION = {"version": VERSION, "hay": False, "nueva": "", "notas": "",
+                        "estado": "", "error": "", "revisado": None}
+# cuándo llegó la última lectura de una pistola: no se actualiza a mitad de un
+# conteo, se espera a que nadie esté leyendo
+ULTIMA_LECTURA = None
+
+
+def _num_version(v):
+    """«v2.10.1» -> (2, 10, 1). Comparar por números y no como texto es lo que
+    hace que la 2.10 se entienda MAYOR que la 2.9."""
+    nums = re.findall(r"\d+", str(v or ""))
+    return tuple(int(n) for n in nums[:4]) if nums else (0,)
+
+
+def hay_version_nueva(actual, publicada):
+    return _num_version(publicada) > _num_version(actual)
+
+
+def buscar_actualizacion(c=None):
+    """Le pregunta al repositorio cuál es la última versión publicada.
+    Devuelve un diccionario; 'hay' dice si toca actualizar."""
+    import urllib.request
+    c = c or cfg()
+    repo = str(c.get("actualizar_repo") or REPO_ACTUALIZACIONES).strip()
+    req = urllib.request.Request(
+        "https://api.github.com/repos/%s/releases/latest" % repo,
+        headers={"Accept": "application/vnd.github+json",
+                 "User-Agent": "InventarioRFID/" + VERSION})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        j = json.loads(r.read().decode("utf-8"))
+    nueva = str(j.get("tag_name") or "")
+    exe = None
+    for a in j.get("assets") or []:
+        if str(a.get("name") or "").lower() == NOMBRE_EXE.lower():
+            exe = a
+            break
+    info = {"version": VERSION, "nueva": nueva,
+            "notas": str(j.get("body") or "")[:4000],
+            "url": str((exe or {}).get("browser_download_url") or ""),
+            "tamano": int((exe or {}).get("size") or 0),
+            "hay": bool(exe) and hay_version_nueva(VERSION, nueva),
+            "revisado": datetime.now().isoformat(timespec="seconds"), "error": ""}
+    # solo molesta con esto si la publicada es MÁS NUEVA pero no se puede
+    # instalar sola; si ya tenemos una igual o mejor, no hay nada que decir
+    if nueva and not exe and hay_version_nueva(VERSION, nueva):
+        info["error"] = ("la versión %s no trae el programa (%s) para instalar sola"
+                         % (nueva, NOMBRE_EXE))
+    return info
+
+
+def _descargar_exe(url, destino, tamano=0):
+    """Baja el programa nuevo comprobando que venga de donde debe y que llegue
+    entero. Si algo no cuadra se borra y no se instala nada."""
+    import urllib.request
+    from urllib.parse import urlparse
+    u = urlparse(url)
+    host = (u.hostname or "").lower()
+    if u.scheme != "https" or not (host == "github.com"
+                                   or host.endswith(".githubusercontent.com")):
+        raise OSError("la descarga no viene de GitHub: se cancela por seguridad")
+    req = urllib.request.Request(url, headers={"User-Agent": "InventarioRFID/" + VERSION})
+    with urllib.request.urlopen(req, timeout=180) as r, open(destino, "wb") as f:
+        shutil.copyfileobj(r, f, 256 * 1024)
+    n = os.path.getsize(destino)
+    if tamano and n != tamano:
+        os.remove(destino)
+        raise OSError("la descarga llegó incompleta (%d de %d bytes)" % (n, tamano))
+    if n < 1024 * 1024:
+        os.remove(destino)
+        raise OSError("el archivo descargado es demasiado pequeño (%d bytes)" % n)
+    # OJO: hay que CERRAR el archivo antes de borrarlo; Windows no deja
+    # borrar lo que sigue abierto.
+    with open(destino, "rb") as f:
+        cabecera = f.read(2)
+    if cabecera != b"MZ":
+        os.remove(destino)
+        raise OSError("lo descargado no es un programa de Windows")
+    return n
+
+
+def _reiniciar_programa():
+    """Se vuelve a abrir solo. En Windows esto hay que hacerlo desde FUERA del
+    proceso que se está cerrando, así que se deja una orden esperando."""
+    exe = os.path.join(BASE, NOMBRE_EXE)
+    if "--sinventana" in sys.argv:
+        orden = 'schtasks /run /tn "Inventario RFID Servidor"'
+    else:
+        orden = 'start "" "%s"' % exe
+    subprocess.Popen("cmd /c ping 127.0.0.1 -n 5 >nul & " + orden,
+                     shell=True, creationflags=0x00000008 | 0x00000200)
+
+
+def instalar_actualizacion(info=None):
+    """Deja instalada la versión nueva y reinicia el programa.
+
+    En Windows no se puede sobreescribir un .exe en marcha, pero SÍ renombrarlo:
+    por eso el que está corriendo se aparta con su número de versión (queda por
+    si hay que volver atrás) y el nuevo ocupa su sitio."""
+    if not getattr(sys, "frozen", False):
+        raise OSError("solo se actualiza solo el programa instalado (.exe)")
+    info = info or buscar_actualizacion()
+    if not info.get("hay"):
+        raise OSError("no hay ninguna versión nueva que instalar")
+    ESTADO_ACTUALIZACION.update(estado="descargando", error="")
+    actual = os.path.join(BASE, NOMBRE_EXE)
+    nuevo = actual + ".nuevo"
+    _descargar_exe(info["url"], nuevo, info.get("tamano") or 0)
+    try:
+        hacer_respaldo()          # copia de la base ANTES de tocar nada
+    except Exception:
+        pass
+    ESTADO_ACTUALIZACION.update(estado="instalando")
+    viejo = os.path.join(BASE, "ServidorInventarioRFID_v%s.exe" % VERSION)
+    try:
+        if os.path.exists(viejo):
+            os.remove(viejo)
+        os.rename(actual, viejo)          # apartar el que está corriendo
+    except OSError as e:
+        os.remove(nuevo)
+        raise OSError("no se pudo apartar la versión actual: %s" % e)
+    try:
+        os.rename(nuevo, actual)          # poner el nuevo en su sitio
+    except OSError as e:
+        os.rename(viejo, actual)          # dejarlo todo como estaba
+        raise OSError("no se pudo poner la versión nueva: %s" % e)
+    ESTADO_ACTUALIZACION.update(estado="reiniciando", nueva=info.get("nueva", ""))
+    _reiniciar_programa()
+    threading.Timer(2.0, lambda: os._exit(0)).start()
+    return {"instalada": info.get("nueva", ""), "anterior": VERSION, "copia": viejo}
+
+
+def _nadie_leyendo(minutos=10):
+    """True si hace rato que ninguna pistola manda lecturas: es el momento
+    seguro para reiniciar sin cortarle el conteo a nadie."""
+    if not ULTIMA_LECTURA:
+        return True
+    return (datetime.now() - ULTIMA_LECTURA) > timedelta(minutes=minutos)
+
+
+def bucle_actualizaciones():
+    """Cada pocas horas mira si hay versión nueva. Si «actualizar_auto» está
+    puesto, la instala sola cuando nadie está leyendo con la pistola."""
+    time.sleep(60)             # deja que el servidor termine de arrancar
+    while True:
+        try:
+            c = cfg()
+            if c.get("actualizar_revisar", True):
+                info = buscar_actualizacion(c)
+                ESTADO_ACTUALIZACION.update(info)
+                if info.get("hay") and c.get("actualizar_auto", True) \
+                        and getattr(sys, "frozen", False) and _nadie_leyendo():
+                    instalar_actualizacion(info)
+        except Exception as e:
+            ESTADO_ACTUALIZACION.update(
+                error=str(e)[:300],
+                revisado=datetime.now().isoformat(timespec="seconds"))
+        time.sleep(max(1, int(HORAS_ENTRE_REVISIONES)) * 3600)
+
+
+_actualizaciones_iniciado = False
+
+
+def iniciar_actualizaciones():
+    """Arranca el vigilante una sola vez (solo en la instancia que sirve)."""
+    global _actualizaciones_iniciado
+    if not _actualizaciones_iniciado:
+        _actualizaciones_iniciado = True
+        threading.Thread(target=bucle_actualizaciones, daemon=True).start()
+
+
+@app.get("/api/actualizacion")
+def api_actualizacion():
+    """Lo último que se sabe, sin salir a internet (lo pinta la pantalla)."""
+    return jsonify(dict(ESTADO_ACTUALIZACION, version=VERSION,
+                        instalable=bool(getattr(sys, "frozen", False))))
+
+
+@app.post("/api/actualizacion/buscar")
+def api_actualizacion_buscar():
+    """Mira AHORA si hay versión nueva (botón de ⚙ Configuración)."""
+    try:
+        info = buscar_actualizacion()
+    except Exception as e:
+        ESTADO_ACTUALIZACION.update(error=str(e)[:300])
+        return jsonify(ok=False, error="No se pudo consultar: %s" % e), 502
+    ESTADO_ACTUALIZACION.update(info)
+    return jsonify(ok=True, **dict(info, instalable=bool(getattr(sys, "frozen", False))))
+
+
+@app.post("/api/actualizacion/instalar")
+def api_actualizacion_instalar():
+    """Instala la versión nueva y reinicia el programa."""
+    try:
+        r = instalar_actualizacion()
+    except OSError as e:
+        ESTADO_ACTUALIZACION.update(estado="", error=str(e)[:300])
+        return jsonify(ok=False, error=str(e)), 502
+    except Exception as e:
+        ESTADO_ACTUALIZACION.update(estado="", error=str(e)[:300])
+        return jsonify(ok=False, error="Falló la actualización: %s" % e), 502
+    return jsonify(ok=True, msg="Actualizado a la versión %s. El programa se "
+                                "reinicia solo en unos segundos." % r["instalada"], **r)
+
+
 def esperar_servidor(timeout=10):
     """Espera a que el puerto 5000 responda antes de abrir la ventana."""
     import time
@@ -3378,7 +4169,8 @@ if __name__ == "__main__":
     print("  Local:   http://localhost:5000")
     print(f"  Red:     http://{ip}:5000  (usar esta URL en la pistola)\n")
     def correr():
-        iniciar_respaldos()   # copia de seguridad diaria (solo quien sirve)
+        iniciar_respaldos()        # copia de seguridad diaria (solo quien sirve)
+        iniciar_actualizaciones()  # se pone al dia solo cuando hay version nueva
         app.run(host="0.0.0.0", port=5000, debug=False)
     if "--sinventana" in sys.argv:
         # Modo PC SERVIDOR (siempre prendido): corre sin ventana y no se apaga
