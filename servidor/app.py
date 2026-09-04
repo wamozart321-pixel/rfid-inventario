@@ -1967,6 +1967,7 @@ def api_dashboard():
             FROM lecturas l LEFT JOIN tags t ON t.epc=l.epc
             LEFT JOIN productos p ON p.id=t.producto_id
             WHERE l.sesion_id=? ORDER BY l.id DESC LIMIT 12""", (s["id"],)).fetchall()]
+    revisar_si_toca()   # abrir la pantalla dispara la revisión
     return jsonify(productos=tot, tags=tags, leidos=leidos,
                    sesion=(dict(s) if s else None), ultimas=ultimas,
                    respaldo=ULTIMO_RESPALDO,   # para avisar de la copia diaria
@@ -3941,10 +3942,12 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "2.1"
+VERSION = "2.2"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
-HORAS_ENTRE_REVISIONES = 6
+PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida
+MINUTOS_ENTRE_REVISIONES = 60
+MINUTOS_MINIMOS = 10          # no se molesta a GitHub más seguido que esto
 # lo último que se sabe de las actualizaciones (lo lee la pantalla para avisar)
 ESTADO_ACTUALIZACION = {"version": VERSION, "hay": False, "nueva": "", "notas": "",
                         "estado": "", "error": "", "revisado": None}
@@ -4085,10 +4088,49 @@ def _nadie_leyendo(minutos=10):
     return (datetime.now() - ULTIMA_LECTURA) > timedelta(minutes=minutos)
 
 
+_revisando = False
+
+
+def _revisado_hace_poco(minutos=MINUTOS_MINIMOS):
+    r = ESTADO_ACTUALIZACION.get("revisado")
+    if not r:
+        return False
+    try:
+        return (datetime.now() - datetime.fromisoformat(r)) < timedelta(minutes=minutos)
+    except (TypeError, ValueError):
+        return False
+
+
+def revisar_si_toca():
+    """Lanza una revisión EN SEGUNDO PLANO si hace rato que no se mira. La usa
+    la pantalla al abrirse: así el aviso sale a los pocos segundos de entrar,
+    sin que nadie tenga que esperar ni pulsar nada."""
+    global _revisando
+    if _revisando or _revisado_hace_poco():
+        return False
+    if not cfg().get("actualizar_revisar", True):
+        return False
+    _revisando = True
+
+    def tarea():
+        global _revisando
+        try:
+            ESTADO_ACTUALIZACION.update(buscar_actualizacion())
+        except Exception as e:
+            ESTADO_ACTUALIZACION.update(
+                error=str(e)[:300],
+                revisado=datetime.now().isoformat(timespec="seconds"))
+        finally:
+            _revisando = False
+
+    threading.Thread(target=tarea, daemon=True).start()
+    return True
+
+
 def bucle_actualizaciones():
     """Cada pocas horas mira si hay versión nueva. Si «actualizar_auto» está
     puesto, la instala sola cuando nadie está leyendo con la pistola."""
-    time.sleep(60)             # deja que el servidor termine de arrancar
+    time.sleep(PRIMERA_REVISION_SEG)   # al arrancar se mira casi enseguida
     while True:
         try:
             c = cfg()
@@ -4102,7 +4144,7 @@ def bucle_actualizaciones():
             ESTADO_ACTUALIZACION.update(
                 error=str(e)[:300],
                 revisado=datetime.now().isoformat(timespec="seconds"))
-        time.sleep(max(1, int(HORAS_ENTRE_REVISIONES)) * 3600)
+        time.sleep(max(1, int(MINUTOS_ENTRE_REVISIONES)) * 60)
 
 
 _actualizaciones_iniciado = False
@@ -4118,7 +4160,9 @@ def iniciar_actualizaciones():
 
 @app.get("/api/actualizacion")
 def api_actualizacion():
-    """Lo último que se sabe, sin salir a internet (lo pinta la pantalla)."""
+    """Lo último que se sabe. De paso lanza una revisión en segundo plano si
+    hace rato que no se mira, así el aviso aparece a los pocos segundos."""
+    revisar_si_toca()
     return jsonify(dict(ESTADO_ACTUALIZACION, version=VERSION,
                         instalable=bool(getattr(sys, "frozen", False))))
 
