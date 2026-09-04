@@ -6,7 +6,7 @@
 ; (para MUDAR el servidor a otro PC), que antes guarda copia de los actuales.
 
 #define MyAppName "Inventario RFID"
-#define MyAppVersion "2.0"
+#define MyAppVersion "2.3"
 #define MyAppExeName "ServidorInventarioRFID.exe"
 
 [Setup]
@@ -42,9 +42,10 @@ Source: "c:\Users\DISEÑO\Downloads\rfid-inventario\servidor\config.json"; DestD
 ; ...y si se marcó "REEMPLAZAR", se pisan con los del instalador (ya respaldados)
 Source: "c:\Users\DISEÑO\Downloads\rfid-inventario\servidor\inventario.db"; DestDir: "{app}"; Flags: ignoreversion uninsneveruninstall skipifsourcedoesntexist; Tasks: reemplazardb
 Source: "c:\Users\DISEÑO\Downloads\rfid-inventario\servidor\config.json"; DestDir: "{app}"; Flags: ignoreversion uninsneveruninstall skipifsourcedoesntexist; Tasks: reemplazardb
-; Instaladores para los OTROS PCs y los VENDEDORES (a mano para llevar en USB)
-Source: "c:\Users\DISEÑO\Downloads\rfid-inventario\Instalar-InventarioRFID-OtrosPCs.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "c:\Users\DISEÑO\Downloads\rfid-inventario\Instalar-InventarioRFID-Vendedores.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; Instalador del inventario para los DEMÁS PCs (mostrador, vendedores y el
+; principal): queda aquí para llevarlo en un USB. Es uno solo: el tipo de PC
+; se elige durante su instalación.
+Source: "c:\Users\DISEÑO\Downloads\rfid-inventario\Instalar-InventarioRFID-PCs.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{autodesktop}\Servidor Inventario RFID"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
@@ -96,6 +97,31 @@ begin
     FileCopy(actual, carpeta + 'config_ANTES_' + sello + '.json', False);
 end;
 
+{ Deja SOLO el arranque elegido.
+
+  Inno crea accesos directos pero NUNCA borra los de una instalación anterior:
+  por eso, si alguna vez se marcó "iniciar con ventana", ese acceso se quedaba
+  en la carpeta de Inicio y seguía abriendo la ventana del inventario al
+  prender el PC — aunque después se instalara en modo SERVIDOR sin ventana.
+  Eso es lo que pasó en el PC 192.168.0.5. }
+procedure LimpiarArranques();
+var
+  atajo: String;
+  codigo: Integer;
+begin
+  atajo := ExpandConstant('{commonstartup}\Servidor Inventario RFID.lnk');
+  if WizardIsTaskSelected('autostartsrv') or (not WizardIsTaskSelected('autostart')) then
+    DeleteFile(atajo);
+  { y al revés: si ya no se quiere el modo servidor, fuera la tarea de Windows }
+  if not WizardIsTaskSelected('autostartsrv') then
+  begin
+    Exec('schtasks', '/end /tn "Inventario RFID Servidor"', '', SW_HIDE,
+         ewWaitUntilTerminated, codigo);
+    Exec('schtasks', '/delete /f /tn "Inventario RFID Servidor"', '', SW_HIDE,
+         ewWaitUntilTerminated, codigo);
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
@@ -104,6 +130,8 @@ begin
     if WizardIsTaskSelected('reemplazardb') then
       RespaldarSiSeReemplaza();
   end;
+  if CurStep = ssPostInstall then
+    LimpiarArranques();
 end;
 
 { Aviso claro al marcar la casilla: es la única acción del instalador que

@@ -273,7 +273,11 @@ def vigilar_servidor(ventana):
 
 def main():
     global MODO
-    if "--principal" in sys.argv and MODO != "vendedor":
+    # El modo se elige al INSTALAR y viaja en el acceso directo, así que este
+    # mismo programa sirve para los tres tipos de PC.
+    if "--vendedor" in sys.argv:
+        MODO = "vendedor"
+    elif "--principal" in sys.argv and MODO != "vendedor":
         MODO = "principal"
     import webview
     titulo = {"vendedor": f"Inventario RFID · {socket.gethostname()} (consulta vendedores)",
