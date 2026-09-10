@@ -1,11 +1,11 @@
-; Instalador del INVENTARIO para los PCs que NO son el servidor.
+﻿; Instalador del INVENTARIO para los PCs que NO son el servidor.
 ; Un solo programa sirve para los tres tipos de PC (principal, mostrador y
 ; vendedor): el tipo se elige aquí y viaja en el acceso directo.
 ; Compilar con: ISCC.exe instalador_inventario.iss
 ;   -> Instalar-InventarioRFID-PCs.exe
 
 #define MyAppName "Inventario RFID"
-#define MyAppVersion "2.3"
+#define MyAppVersion "2.4"
 #define MyAppExeName "InventarioRFID-Cliente.exe"
 
 [Setup]

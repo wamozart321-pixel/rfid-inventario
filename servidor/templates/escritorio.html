@@ -5,67 +5,114 @@
 <title>Inventario RFID</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <style>
+/* ---------- PALETA ----------
+   Claro por defecto. El modo oscuro solo cambia estas variables: el resto de
+   la hoja de estilos no sabe nada del tema. Los colores de MARCA (naranja,
+   rojo del PC principal, verde de vendedores) NO son variables a propósito:
+   el servidor los sustituye como texto para pintar cada modo. */
+:root{
+  --fondo:#FFFFFF; --caja:#F3F2F1; --caja2:#FBFAF9; --campo:#FFFFFF;
+  --fila-par:#FAF9F8; --fila-hover:#F3F1EF;
+  --texto:#252423; --texto2:#5A5856; --tenue:#8A8886;
+  --borde:#E1DFDD; --borde2:#E7E5E3; --borde-campo:#C8C6C4;
+  --apagado:#DDDBD9; --scroll:#D3D1CF; --scroll2:#BDBBB9;
+  --aviso:#FDF6E3; --aviso-borde:#E8D9A0;
+  --rot-alta:#EAF6EE; --rot-baja:#FDECEA;
+  --verde:#1F7A44; --ambar:#C9930A; --rojo:#B3261E; --exito:#107C10;
+  --sombra:rgba(0,0,0,.35);
+}
+html[data-tema="oscuro"]{
+  --fondo:#1C1B1A; --caja:#2B2A28; --caja2:#232221; --campo:#2A2927;
+  --fila-par:#201F1E; --fila-hover:#333230;
+  --texto:#E9E7E4; --texto2:#C6C3BF; --tenue:#9C9996;
+  --borde:#3A3836; --borde2:#343230; --borde-campo:#565450;
+  --apagado:#4A4845; --scroll:#4A4845; --scroll2:#605E5B;
+  --aviso:#3A3322; --aviso-borde:#6E5C2C;
+  --rot-alta:#1C3326; --rot-baja:#3A2422;
+  --verde:#6FD79B; --ambar:#E8C15C; --rojo:#F2867E; --exito:#5FC65F;
+  --sombra:rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+/* En oscuro, los toques claros del color de marca se apagan para que no
+   deslumbren (siguen siendo del color del modo, pero en versión oscura). */
+html[data-tema="oscuro"] .bg:hover{background:#3A2E23;border-color:#5E4830}
+html[data-tema="oscuro"] .bg:active{background:#463726}
+html[data-tema="oscuro"] tbody tr.sel{background:#3E3327!important}
+html[data-tema="oscuro"] .dis-item.sel{background:#3A2E23;border-color:#5E4830}
+html[data-tema="oscuro"] .combo-lista div:hover{background:#3A2E23}
+html[data-tema="oscuro"] #barra-filtros.activos{background:#332A22}
+html[data-tema="oscuro"] .chip.cerrada{background:#3A3836;color:#C6C3BF}
+html[data-tema="oscuro"] img{filter:brightness(.94)}
+/* el papel de la etiqueta SIEMPRE es blanco: es lo que se va a imprimir */
+html[data-tema="oscuro"] #dis-etq,
+html[data-tema="oscuro"] #dis-etq *{filter:none}
+#btn-tema{display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:15px;
+          border-left:1px solid var(--borde);user-select:none}
+#btn-tema:hover{background:var(--caja)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font:13px 'Segoe UI',Tahoma,sans-serif;color:#252423;background:#fff;
+body{font:13px 'Segoe UI',Tahoma,sans-serif;color:var(--texto);background:var(--fondo);
      display:flex;flex-direction:column;overflow:hidden;user-select:none}
 /* ---------- tira de pestañas (estilo FactuSOL / Office) ---------- */
-#tira{display:flex;align-items:stretch;background:#fff;border-bottom:1px solid #E1DFDD;height:34px;flex:none}
+#tira{display:flex;align-items:stretch;background:var(--fondo);border-bottom:1px solid var(--borde);height:34px;flex:none}
 #marca{background:#E87722;color:#fff;font-weight:700;padding:0 16px;display:flex;align-items:center;
        font-size:12.5px;letter-spacing:.5px;cursor:pointer;white-space:nowrap}
 #marca:hover{background:#D0641B}
-.tab{padding:0 20px;display:flex;align-items:center;cursor:pointer;color:#484644;font-size:13px}
+.tab{padding:0 20px;display:flex;align-items:center;cursor:pointer;color:var(--texto2);font-size:13px}
 .tab:hover{color:#E87722}
 .tab.activa{color:#C25705;font-weight:600;box-shadow:inset 0 -2.5px 0 #E87722}
-#tira-info{margin-left:auto;display:flex;align-items:center;padding:0 14px;color:#A19F9D;font-size:11.5px;white-space:nowrap}
+#tira-info{margin-left:auto;display:flex;align-items:center;padding:0 14px;color:var(--tenue);font-size:11.5px;white-space:nowrap}
 /* ---------- cinta de opciones ---------- */
-.banda{display:flex;background:#F8F7F6;border-bottom:1px solid #D8D6D3;padding:4px 6px 2px;min-height:92px;flex:none;overflow-x:auto}
+.banda{display:flex;background:var(--caja2);border-bottom:1px solid var(--borde);padding:4px 6px 2px;min-height:92px;flex:none;overflow-x:auto}
 .banda.oculta{display:none}
-.grupo{display:flex;flex-direction:column;padding:0 8px;border-right:1px solid #E4E2DF;flex:none}
+.grupo{display:flex;flex-direction:column;padding:0 8px;border-right:1px solid var(--borde);flex:none}
 .g-bots{display:flex;gap:2px;flex:1;align-items:stretch}
-.g-tit{text-align:center;font-size:10.5px;color:#8A8886;padding:3px 2px 1px;white-space:nowrap}
+.g-tit{text-align:center;font-size:10.5px;color:var(--tenue);padding:3px 2px 1px;white-space:nowrap}
 .bg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
     min-width:62px;max-width:86px;padding:5px 7px;background:none;border:1px solid transparent;
-    border-radius:3px;cursor:pointer;font:11.5px 'Segoe UI';color:#3B3A39;line-height:1.15;text-align:center;position:relative}
+    border-radius:3px;cursor:pointer;font:11.5px 'Segoe UI';color:var(--texto);line-height:1.15;text-align:center;position:relative}
 .bg:hover{background:#FDEBD9;border-color:#F5C9A4}
 .bg:active{background:#FBDCBE}
 .bg .ic{font-size:22px;line-height:1}
 .badge{position:absolute;top:1px;right:4px;background:#C4314B;color:#fff;border-radius:9px;
        padding:1px 6px;font-size:10.5px;font-weight:700}
-#buscar{width:240px;padding:7px 10px;border:1px solid #C8C6C4;border-radius:3px;font:13px 'Segoe UI'}
+#buscar{width:240px;padding:7px 10px;border:1px solid var(--borde-campo);border-radius:3px;
+        font:13px 'Segoe UI';background:var(--campo);color:var(--texto)}
 #buscar:focus{outline:2px solid #E87722;border-color:transparent}
 /* ---------- contenido / tablas ---------- */
-#contenido{flex:1;overflow:hidden;display:flex;background:#fff}
+#contenido{flex:1;overflow:hidden;display:flex;background:var(--fondo)}
 .vista{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 .vista.oculta{display:none}
 .twrap{flex:1;overflow:auto}
 table{width:100%;border-collapse:collapse;font-size:12.8px}
-th{position:sticky;top:0;z-index:2;background:#F3F2F1;border-bottom:1px solid #C8C6C4;
-   border-right:1px solid #E7E5E3;padding:6px 10px;text-align:left;font-weight:600;color:#4C4A48;
+th{position:sticky;top:0;z-index:2;background:var(--caja);border-bottom:1px solid var(--borde-campo);
+   border-right:1px solid var(--borde2);padding:6px 10px;text-align:left;font-weight:600;color:var(--texto2);
    cursor:pointer;white-space:nowrap}
 th.num,td.num{text-align:right}
 th.asc::after{content:' ▲';font-size:9px;color:#E87722}
 th.desc::after{content:' ▼';font-size:9px;color:#E87722}
-td{padding:5px 10px;border-bottom:1px solid #F0EEEC;white-space:nowrap;overflow:hidden;
+td{padding:5px 10px;border-bottom:1px solid var(--borde2);white-space:nowrap;overflow:hidden;
    text-overflow:ellipsis;max-width:430px}
 tbody tr{cursor:default}
-tbody tr:nth-child(even){background:#FAF9F8}
-tbody tr:hover{background:#F3F1EF}
+tbody tr:nth-child(even){background:var(--fila-par)}
+tbody tr:hover{background:var(--fila-hover)}
 tbody tr.sel{background:#FCE0C6!important;box-shadow:inset 3px 0 0 #E87722}
 .mono{font-family:Consolas,monospace;font-size:12px}
-.ok{color:#107C10;font-weight:600}.falta{color:#C4314B;font-weight:600}.sobra{color:#2B579A;font-weight:600}
+.ok{color:var(--exito);font-weight:600}.falta{color:#C4314B;font-weight:600}.sobra{color:#2B579A;font-weight:600}
 /* cabeceras dentro de una vista */
-.cab{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#FBFAF9;
-     border-bottom:1px solid #E1DFDD;flex-wrap:wrap;flex:none}
-.cab input[type=text],.cab input:not([type]){padding:6px 9px;border:1px solid #C8C6C4;border-radius:3px;font:12.5px 'Segoe UI'}
-#barra-filtros select,#barra-filtros input[type=number]{padding:4px 6px;border:1px solid #C8C6C4;border-radius:3px;font:12px 'Segoe UI';color:#252423}
+.cab{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--caja2);
+     border-bottom:1px solid var(--borde);flex-wrap:wrap;flex:none}
+.cab input[type=text],.cab input:not([type]){padding:6px 9px;border:1px solid var(--borde-campo);
+    border-radius:3px;font:12.5px 'Segoe UI';background:var(--campo);color:var(--texto)}
+#barra-filtros select,#barra-filtros input[type=number]{padding:4px 6px;border:1px solid var(--borde-campo);
+    border-radius:3px;font:12px 'Segoe UI';color:var(--texto);background:var(--campo)}
 #barra-filtros.activos{background:#FDF0E6}
 .chip{padding:2px 10px;border-radius:10px;font-size:11.5px;font-weight:600}
-.chip.abierta{background:#DFF6DD;color:#107C10}
-.chip.cerrada{background:#EDEBE9;color:#605E5C}
+.chip.abierta{background:#DFF6DD;color:var(--exito)}
+.chip.cerrada{background:var(--borde2);color:var(--texto2)}
 .chip.total{background:#FDE7D2;color:#B34A00}
 .chip.verificacion{background:#DEECF9;color:#2B579A}
-.hint{font-size:12px;color:#8A8886;font-weight:400;line-height:1.45}
+.hint{font-size:12px;color:var(--tenue);font-weight:400;line-height:1.45}
 /* ---------- barra de estado ---------- */
 #barra{background:#E87722;color:#fff;display:flex;align-items:center;gap:18px;
        padding:4px 12px;font-size:12px;flex:none}
@@ -73,9 +120,9 @@ tbody tr.sel{background:#FCE0C6!important;box-shadow:inset 3px 0 0 #E87722}
 #b-msg{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.95}
 #b-der{white-space:nowrap;font-weight:600}
 /* ---------- botones y modales ---------- */
-.btn{padding:6px 14px;border:1px solid #C8C6C4;background:#fff;border-radius:3px;cursor:pointer;
-     font:12.5px 'Segoe UI';color:#252423;white-space:nowrap}
-.btn:hover{background:#F3F2F1}
+.btn{padding:6px 14px;border:1px solid var(--borde-campo);background:var(--campo);border-radius:3px;cursor:pointer;
+     font:12.5px 'Segoe UI';color:var(--texto);white-space:nowrap}
+.btn:hover{background:var(--caja)}
 .btn.prim{background:#E87722;border-color:#E87722;color:#fff;font-weight:600}
 .btn.prim:hover{background:#D0641B}
 .btn.rojo{background:#C4314B;border-color:#C4314B;color:#fff;font-weight:600}
@@ -84,41 +131,43 @@ tbody tr.sel{background:#FCE0C6!important;box-shadow:inset 3px 0 0 #E87722}
 .btn:disabled{opacity:.55;cursor:default}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;
          justify-content:center;z-index:50}
-.modal{background:#fff;width:min(480px,92vw);max-height:88vh;overflow:auto;border-radius:6px;
+.modal{background:var(--fondo);width:min(480px,92vw);max-height:88vh;overflow:auto;border-radius:6px;
        box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .m-tit{background:#E87722;color:#fff;padding:9px 14px;font-weight:600;display:flex;align-items:center;
        position:sticky;top:0}
 .m-x{margin-left:auto;cursor:pointer;padding:0 6px;font-weight:400}
 .m-x:hover{opacity:.75}
 .m-cuerpo{padding:14px 16px;display:flex;flex-direction:column;gap:10px;user-select:text}
-.m-cuerpo label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#5A5856;font-weight:600}
+.m-cuerpo label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--texto2);font-weight:600}
 .m-cuerpo input:not([type=checkbox]):not([type=radio]),.m-cuerpo select{
-    padding:7px 9px;border:1px solid #C8C6C4;border-radius:3px;font:13px 'Segoe UI';color:#252423;width:100%}
+    padding:7px 9px;border:1px solid var(--borde-campo);border-radius:3px;font:13px 'Segoe UI';
+    color:var(--texto);width:100%;background:var(--campo)}
 .m-cuerpo input:focus{outline:2px solid #E87722;border-color:transparent}
-.m-cuerpo textarea{padding:7px 9px;border:1px solid #C8C6C4;border-radius:3px;
-    font:12.5px/1.45 'Segoe UI';color:#252423;width:100%;box-sizing:border-box;resize:vertical}
+.m-cuerpo textarea{padding:7px 9px;border:1px solid var(--borde-campo);border-radius:3px;
+    font:12.5px/1.45 'Segoe UI';color:var(--texto);width:100%;box-sizing:border-box;resize:vertical;
+    background:var(--campo)}
 .m-cuerpo textarea:focus{outline:2px solid #E87722;border-color:transparent}
 /* buscador de proveedor (se escribe para filtrar) */
-.combo-lista{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid #C8C6C4;
+.combo-lista{position:absolute;left:0;right:0;top:100%;background:var(--campo);border:1px solid var(--borde-campo);
     border-radius:0 0 4px 4px;max-height:190px;overflow:auto;z-index:20;
     box-shadow:0 10px 24px rgba(0,0,0,.22)}
-.combo-lista div{padding:6px 10px;cursor:pointer;font-size:12.5px;font-weight:400;color:#252423}
+.combo-lista div{padding:6px 10px;cursor:pointer;font-size:12.5px;font-weight:400;color:var(--texto)}
 .combo-lista div:hover{background:#FDEEE2}
 .m-pie{display:flex;justify-content:flex-end;gap:8px;padding:4px 16px 14px}
 .fila2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-label.chk,.m-cuerpo label.radio{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:12.5px;color:#252423}
+label.chk,.m-cuerpo label.radio{flex-direction:row;align-items:center;gap:8px;font-weight:400;font-size:12.5px;color:var(--texto)}
 label.chk input,.m-cuerpo label.radio input{width:auto!important}
 .toast{position:fixed;right:16px;bottom:44px;background:#323130;color:#fff;padding:11px 16px;
        border-radius:4px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:60;max-width:62vw;
        font-size:13px;display:none;user-select:text}
 /* panel del editor de diseño */
-.dis-sec{font-size:10.5px;font-weight:700;letter-spacing:.7px;color:#8A8886;margin:12px 0 5px}
+.dis-sec{font-size:10.5px;font-weight:700;letter-spacing:.7px;color:var(--tenue);margin:12px 0 5px}
 .dis-sec:first-child{margin-top:0}
 .dis-item{display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;
           border:1px solid transparent;border-radius:4px;font-size:12.3px;cursor:pointer;
-          user-select:none;color:#8A8886}
-.dis-item:hover{background:#F3F1EF}
-.dis-item.on{background:#fff;border-color:#E7E5E3;color:#252423}
+          user-select:none;color:var(--tenue)}
+.dis-item:hover{background:var(--fila-hover)}
+.dis-item.on{background:var(--campo);border-color:var(--borde2);color:var(--texto)}
 .dis-item.sel{background:#FDEBD9;border-color:#F5C9A4}
 .dis-item input{width:auto!important;flex:none;accent-color:#E87722}
 .dis-item .di-ic{width:20px;text-align:center;flex:none;font-size:13px}
@@ -130,9 +179,21 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
 #dis-cargando{position:absolute;right:8px;top:8px;background:rgba(232,119,34,.92);color:#fff;
   font-size:10.5px;padding:2px 8px;border-radius:9px;z-index:6;display:none}
 ::-webkit-scrollbar{width:12px;height:12px}
-::-webkit-scrollbar-thumb{background:#D3D1CF;border-radius:6px;border:3px solid #fff}
-::-webkit-scrollbar-thumb:hover{background:#BDBBB9}
+::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px;border:3px solid var(--fondo)}
+::-webkit-scrollbar-thumb:hover{background:var(--scroll2)}
 </style>
+<script>
+/* Se aplica aquí, en la cabecera, para que la pantalla no dé un fogonazo
+   blanco antes de ponerse oscura. Si nadie ha elegido, se hace caso a lo que
+   tenga puesto Windows. */
+(function(){
+  var t;
+  try{ t = localStorage.getItem('tema'); }catch(e){}
+  if(!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+             ? 'oscuro' : 'claro';
+  document.documentElement.setAttribute('data-tema', t);
+})();
+</script>
 </head>
 <body>
 
@@ -142,6 +203,7 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
   <div class="tab activa" data-tab="productos">Productos</div>
   {% if modo != 'vendedor' %}<div class="tab" data-tab="inventario">Inventario</div>{% endif %}
   <div id="tira-info">{% if modo == 'vendedor' %}👁 SOLO CONSULTA (VENDEDORES) &nbsp;·&nbsp; {% elif modo == 'principal' %}🖥 PC PRINCIPAL &nbsp;·&nbsp; {% endif %}REPUESTOSVOLKSWAGENCOM SAS</div>
+  <div id="btn-tema" onclick="cambiarTema()" title="Cambiar entre claro y oscuro">🌙</div>
 </div>
 
 <!-- cinta: Productos -->
@@ -234,22 +296,22 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
 
   <div class="vista" id="v-productos">
     <div class="cab" id="barra-filtros" style="font-size:12px;gap:8px">
-      <span style="font-weight:600;color:#5A5856">🔎 Filtros:</span>
-      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Proveedor
+      <span style="font-weight:600;color:var(--texto2)">🔎 Filtros:</span>
+      <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Proveedor
         <select id="fl-prov" onchange="aplicarFiltros()" style="max-width:150px"><option value="">todos</option></select></label>
-      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Bodega
+      <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Bodega
         <select id="fl-bod" onchange="aplicarFiltros()"><option value="">todas</option></select></label>
-      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Stock
+      <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Stock
         <select id="fl-stock" onchange="aplicarFiltros()">
           <option value="">cualquiera</option>
           <option value="0">agotados (0)</option>
           <option value="pos">con stock (&gt;0)</option>
           <option value="bajo">stock bajo (1–5)</option>
         </select></label>
-      <span style="display:flex;align-items:center;gap:3px;color:#5A5856">Precio
+      <span style="display:flex;align-items:center;gap:3px;color:var(--texto2)">Precio
         <input id="fl-pmin" type="number" min="0" placeholder="mín" style="width:72px" oninput="aplicarFiltros()">–
         <input id="fl-pmax" type="number" min="0" placeholder="máx" style="width:72px" oninput="aplicarFiltros()"></span>
-      <span style="display:flex;align-items:center;gap:3px;color:#5A5856">Cant.
+      <span style="display:flex;align-items:center;gap:3px;color:var(--texto2)">Cant.
         <input id="fl-cmin" type="number" min="0" placeholder="mín" style="width:58px" oninput="aplicarFiltros()">–
         <input id="fl-cmax" type="number" min="0" placeholder="máx" style="width:58px" oninput="aplicarFiltros()"></span>
       <label class="chk" style="font-size:12px"><input type="checkbox" id="fl-tag" onchange="aplicarFiltros()"> con etiqueta</label>
@@ -301,9 +363,9 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
     <div class="cab oculta" id="ses-filtros" style="font-size:12px;gap:8px">
       <input id="ses-buscar" type="text" placeholder="🔍 SKU, nombre o código de barras…"
              style="width:180px" oninput="renderResumen(true)">
-      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Bodega
+      <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Bodega
         <select id="ses-bod" onchange="renderResumen(true)"><option value="">todas</option></select></label>
-      <label style="display:flex;align-items:center;gap:4px;color:#5A5856">Diferencia
+      <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Diferencia
         <select id="ses-dif" onchange="renderResumen(true)">
           <option value="">cualquiera</option>
           <option value="falta">faltan (−)</option>
@@ -329,10 +391,10 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
   <div class="vista oculta" id="v-diseno">
     <div class="cab">
       <b>🎨 Diseño de etiqueta</b>
-      <span style="display:flex;margin-left:12px;border:1px solid #C8C6C4;border-radius:6px;overflow:hidden">
+      <span style="display:flex;margin-left:12px;border:1px solid var(--borde-campo);border-radius:6px;overflow:hidden">
         <button class="btn prim" id="tab-dis-cb" style="border:0;border-radius:0"
                 onclick="tabDiseno('cb')">🏷️ Código de barras</button>
-        <button class="btn" id="tab-dis-desc" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+        <button class="btn" id="tab-dis-desc" style="border:0;border-radius:0;border-left:1px solid var(--borde-campo)"
                 onclick="tabDiseno('desc')">📝 Descripción</button>
       </span>
       <input id="dis-sku" placeholder="Referencia de muestra" style="margin-left:auto;width:150px"
@@ -345,8 +407,8 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
       <button class="btn prim" onclick="guardarDiseno()">💾 Guardar diseño</button>
     </div>
     <div style="flex:1;display:flex;overflow:hidden">
-      <div id="dis-panel" style="width:250px;flex:none;overflow-y:auto;border-right:1px solid #E1DFDD;
-           padding:10px 12px;background:#FBFAF9"></div>
+      <div id="dis-panel" style="width:250px;flex:none;overflow-y:auto;border-right:1px solid var(--borde);
+           padding:10px 12px;background:var(--caja2)"></div>
       <div id="dis-lienzo" style="flex:1;overflow:auto;position:relative;background:#DEDBD7;
            display:flex;padding:24px"></div>
     </div>
@@ -355,22 +417,22 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
   <div class="vista oculta" id="v-ventas">
     <div class="cab">
       <b>🏆 Productos que más se venden</b>
-      <span style="display:flex;margin-left:12px;border:1px solid #C8C6C4;border-radius:6px;overflow:hidden">
+      <span style="display:flex;margin-left:12px;border:1px solid var(--borde-campo);border-radius:6px;overflow:hidden">
         <button class="btn" id="vta-dia" style="border:0;border-radius:0"
                 onclick="periodoVentas('dia')">Hoy</button>
-        <button class="btn prim" id="vta-mes" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+        <button class="btn prim" id="vta-mes" style="border:0;border-radius:0;border-left:1px solid var(--borde-campo)"
                 onclick="periodoVentas('mes')">Este mes</button>
-        <button class="btn" id="vta-ano" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+        <button class="btn" id="vta-ano" style="border:0;border-radius:0;border-left:1px solid var(--borde-campo)"
                 onclick="periodoVentas('ano')">Este año</button>
       </span>
-      <span style="display:flex;margin-left:10px;border:1px solid #C8C6C4;border-radius:6px;overflow:hidden">
+      <span style="display:flex;margin-left:10px;border:1px solid var(--borde-campo);border-radius:6px;overflow:hidden">
         <button class="btn" id="vtg-barras" style="border:0;border-radius:0" title="Barras horizontales"
                 onclick="tipoGrafica('barras')">📊 Barras</button>
-        <button class="btn" id="vtg-columnas" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+        <button class="btn" id="vtg-columnas" style="border:0;border-radius:0;border-left:1px solid var(--borde-campo)"
                 title="Columnas verticales" onclick="tipoGrafica('columnas')">📶 Columnas</button>
-        <button class="btn" id="vtg-torta" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+        <button class="btn" id="vtg-torta" style="border:0;border-radius:0;border-left:1px solid var(--borde-campo)"
                 title="Participación de cada producto" onclick="tipoGrafica('torta')">🥧 Torta</button>
-        <button class="btn" id="vtg-linea" style="border:0;border-radius:0;border-left:1px solid #C8C6C4"
+        <button class="btn" id="vtg-linea" style="border:0;border-radius:0;border-left:1px solid var(--borde-campo)"
                 title="Ventas a lo largo del tiempo" onclick="tipoGrafica('linea')">📈 Línea</button>
       </span>
       <button class="btn" style="margin-left:auto" onclick="verVentas()">🔄 Actualizar</button>
@@ -403,7 +465,7 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
     </div>
 
     <div id="bal-pistolas" style="margin:8px 10px 0;padding:9px 12px;border-radius:6px;
-         border:1px solid #E1DFDD;background:#F3F2F1;line-height:1.5"></div>
+         border:1px solid var(--borde);background:var(--caja);line-height:1.5"></div>
 
     <div style="display:flex;gap:12px;align-items:flex-start;padding:10px;overflow:auto;flex:1">
 
@@ -864,12 +926,12 @@ function formProducto(p){
     ${p ? `<div class="hint" style="margin-top:2px">Stock actual:
       <b>${fmt(p.cantidad_esperada)}</b>${p.ubicacion ? ' en ' + esc(p.ubicacion) : ''}
       — se ajusta con el botón <b>🔢 Fijar stock</b> (unidades por bodega)</div>
-      <div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:8px">🚦 Rotación</div>
+      <div style="font-size:12px;color:var(--texto2);font-weight:600;margin-top:8px">🚦 Rotación</div>
       <div id="f-rot">${semaforoChico(p)}</div>
-      <div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:6px">📍 Posición por bodega
+      <div style="font-size:12px;color:var(--texto2);font-weight:600;margin-top:6px">📍 Posición por bodega
         <span class="hint" style="font-weight:400">(dónde está guardado: A1, F6…)</span></div>
       <div id="f-posiciones" class="hint" style="margin-top:2px">cargando…</div>`
-    : `<div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:4px">Stock inicial por bodega
+    : `<div style="font-size:12px;color:var(--texto2);font-weight:600;margin-top:4px">Stock inicial por bodega
         <span class="hint" style="font-weight:400">(opcional; luego se ajusta con 🔢 Fijar stock)</span></div>
        <div id="f-bodegas">${filaBodegaHtml(null)}</div>
        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
@@ -901,17 +963,17 @@ function formProducto(p){
       se completa sola con la configurada${cfgFotos ? ' — ' + esc(cfgFotos) : ' en ⚙ Configuración'}.</span>
     </label>
     <div id="f-previews">
-      <div style="font-size:12px;color:#5A5856;font-weight:600">👁 Así saldrán sus etiquetas
+      <div style="font-size:12px;color:var(--texto2);font-weight:600">👁 Así saldrán sus etiquetas
         <span class="hint" style="font-weight:400">(se actualizan mientras escribes)</span></div>
       <div class="fila2" style="align-items:start;margin-top:4px">
         <div>
           <div class="hint" style="margin:0 0 3px;text-align:center">🏷️ Código de barras (Zebra)</div>
-          <img id="f-prev-cb" alt="" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;background:#fff;display:none">
+          <img id="f-prev-cb" alt="" style="width:100%;border:1px solid var(--borde);border-radius:6px;background:#fff;display:none">
           <div class="hint" id="f-prev-cb-msg" style="text-align:center">generando…</div>
         </div>
         <div>
           <div class="hint" style="margin:0 0 3px;text-align:center">📝 Descripción (SAT)</div>
-          <img id="f-prev-desc" alt="" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;background:#fff;display:none">
+          <img id="f-prev-desc" alt="" style="width:100%;border:1px solid var(--borde);border-radius:6px;background:#fff;display:none">
           <div class="hint" id="f-prev-desc-msg" style="text-align:center">generando…</div>
         </div>
       </div>
@@ -948,7 +1010,7 @@ function iniciarComboProv(ov){
       .filter(pr => !q || String(pr.codigo).startsWith(q) || sin(pr.nombre).includes(q));
     lista.innerHTML = items.map(pr =>
       `<div data-c="${pr.codigo}">${pr.codigo ? pr.codigo + ' — ' : ''}${esc(pr.nombre)}</div>`).join('')
-      + `<div data-c="__nuevo__" style="color:#C25705;font-weight:600;border-top:1px solid #E7E5E3">➕ Agregar proveedor nuevo…</div>`;
+      + `<div data-c="__nuevo__" style="color:#C25705;font-weight:600;border-top:1px solid var(--borde2)">➕ Agregar proveedor nuevo…</div>`;
     lista.style.display = '';
   };
   const elegir = c => {
@@ -1223,27 +1285,27 @@ async function impAnalizar(hoja){
     if(!r.ok || !j.ok) throw new Error(j.error || 'No se pudo leer el archivo');
     impInfo = j;
     impRender();
-  }catch(e){ zona.innerHTML = `<div class="hint" style="margin-top:8px;color:#B3261E">✖ ${esc(e.message)}</div>`; }
+  }catch(e){ zona.innerHTML = `<div class="hint" style="margin-top:8px;color:var(--rojo)">✖ ${esc(e.message)}</div>`; }
 }
 function impRender(){
   const j = impInfo, zona = document.getElementById('imp-zona');
   if(!j || !zona) return;
   const sel = campo => `
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px;font-size:12px">
-      <span style="width:150px;flex:none;color:#5A5856">${campo[1]}</span>
-      <select id="imp-map-${campo[0]}" style="flex:1;padding:3px;border:1px solid #C8C6C4;border-radius:3px">
+      <span style="width:150px;flex:none;color:var(--texto2)">${campo[1]}</span>
+      <select id="imp-map-${campo[0]}" style="flex:1;padding:3px;border:1px solid var(--borde-campo);border-radius:3px">
         <option value="">— no usar —</option>
         ${j.columnas.map(c => `<option value="${c.i}" ${j.mapeo[campo[0]] === c.i ? 'selected' : ''}>${esc(c.titulo)}</option>`).join('')}
       </select></div>`;
   zona.innerHTML = `
     ${j.hojas.length > 1 ? `
     <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px">
-      <span style="width:150px;flex:none;color:#5A5856">Hoja del Excel</span>
-      <select style="flex:1;padding:3px;border:1px solid #C8C6C4;border-radius:3px"
+      <span style="width:150px;flex:none;color:var(--texto2)">Hoja del Excel</span>
+      <select style="flex:1;padding:3px;border:1px solid var(--borde-campo);border-radius:3px"
               onchange="impAnalizar(this.value)">
         ${j.hojas.map(h => `<option ${h === j.hoja ? 'selected' : ''}>${esc(h)}</option>`).join('')}
       </select></div>` : ''}
-    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">¿Qué quieres importar?</div>
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:var(--texto2)">¿Qué quieres importar?</div>
     ${[['productos','Productos (crea nuevos y actualiza existentes)'],
        ['precios','Solo precios (y regenera el código de barras)'],
        ['inventario','Conteo de inventario (reemplaza el stock)'],
@@ -1253,12 +1315,12 @@ function impRender(){
       <label class="chk" style="margin-top:3px;font-size:12px">
         <input type="radio" name="imp-tipo" value="${v}" ${impTipo === v ? 'checked' : ''}
                onchange="impTipo=this.value;impRender()"> ${n}</label>`).join('')}
-    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:var(--texto2)">
       Columnas del archivo (revisa que estén bien)</div>
     ${IMP_CAMPOS[impTipo].map(sel).join('')}
     ${impTipo !== 'precios' && (j.bodegas_sugeridas || []).length ? `
-    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
-      Unidades por bodega <span style="font-weight:400;color:#8A8886">(cada columna marcada es una bodega)</span></div>
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:var(--texto2)">
+      Unidades por bodega <span style="font-weight:400;color:var(--tenue)">(cada columna marcada es una bodega)</span></div>
     <div style="display:flex;flex-wrap:wrap;gap:2px 16px">
       ${j.bodegas_sugeridas.map(i => `
       <label class="chk" style="margin-top:3px;font-size:12px">
@@ -1268,21 +1330,21 @@ function impRender(){
     el total y la ubicación se calculan solos.</div>` : ''}
     ${(impTipo === 'posiciones' || impTipo === 'productos') ? `
     <div id="imp-zona-pos" style="display:${j.mapeo.posicion !== undefined || impTipo === 'posiciones' ? '' : 'none'}">
-      <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+      <div style="margin-top:10px;font-size:12px;font-weight:600;color:var(--texto2)">
         ¿A qué bodega pertenecen esas posiciones?</div>
-      <select id="imp-bod-pos" style="width:100%;padding:4px;border:1px solid #C8C6C4;border-radius:3px;font-size:12px">
+      <select id="imp-bod-pos" style="width:100%;padding:4px;border:1px solid var(--borde-campo);border-radius:3px;font-size:12px">
         ${(bodegasLista.length ? bodegasLista : ['ALMACEN']).map(b =>
           `<option ${b === 'ALMACEN' ? 'selected' : ''}>${esc(b)}</option>`).join('')}
       </select>
       <div class="hint">La posición (A1, F6…) dice dónde está guardado el repuesto
       DENTRO de esa bodega. No cambia las cantidades.</div>
     </div>` : ''}
-    <div style="margin-top:10px;font-size:12px;font-weight:600;color:#5A5856">
+    <div style="margin-top:10px;font-size:12px;font-weight:600;color:var(--texto2)">
       Vista previa (${fmt(j.total)} filas de datos)</div>
-    <div style="overflow:auto;max-height:130px;border:1px solid #E7E5E3;border-radius:4px;margin-top:4px">
+    <div style="overflow:auto;max-height:130px;border:1px solid var(--borde2);border-radius:4px;margin-top:4px">
       <table style="font-size:11px;white-space:nowrap">
-        <tr>${j.columnas.map(c => `<th style="padding:3px 8px;background:#F3F1EF;text-align:left">${esc(c.titulo)}</th>`).join('')}</tr>
-        ${j.muestra.map(f => `<tr>${f.map(c => `<td style="padding:2px 8px;border-top:1px solid #F3F1EF">${esc(c)}</td>`).join('')}</tr>`).join('')}
+        <tr>${j.columnas.map(c => `<th style="padding:3px 8px;background:var(--fila-hover);text-align:left">${esc(c.titulo)}</th>`).join('')}</tr>
+        ${j.muestra.map(f => `<tr>${f.map(c => `<td style="padding:2px 8px;border-top:1px solid var(--fila-hover)">${esc(c)}</td>`).join('')}</tr>`).join('')}
       </table></div>
     <div style="display:flex;justify-content:flex-end;margin-top:10px">
       <button class="btn prim" id="imp-boton" onclick="impEjecutar()">⬆ Importar ${fmt(j.total)} filas</button>
@@ -1308,15 +1370,15 @@ async function impEjecutar(){
       ${j.creados ? `Productos creados: <b>${fmt(j.creados)}</b><br>` : ''}
       ${j.actualizados ? `Actualizados: <b>${fmt(j.actualizados)}</b><br>` : ''}
       ${j.sin_cambios ? `Sin cambios (ya estaban igual): ${fmt(j.sin_cambios)}<br>` : ''}
-      ${j.no_encontrados ? `<span style="color:#B3261E">Referencias que NO existen en el catálogo: <b>${fmt(j.no_encontrados)}</b>
+      ${j.no_encontrados ? `<span style="color:var(--rojo)">Referencias que NO existen en el catálogo: <b>${fmt(j.no_encontrados)}</b>
         (${j.no_encontrados_lista.map(esc).join(', ')}${j.no_encontrados > 15 ? '…' : ''})</span><br>` : ''}
-      ${j.errores.length ? `<span style="color:#B3261E">Errores:<br>${j.errores.map(esc).join('<br>')}</span>` : ''}
+      ${j.errores.length ? `<span style="color:var(--rojo)">Errores:<br>${j.errores.map(esc).join('<br>')}</span>` : ''}
     </div>`;
     res.innerHTML = h;
     bot.textContent = '✔ Listo';
     await cargarProductos();
   }catch(e){
-    res.innerHTML = `<div class="hint" style="margin-top:8px;color:#B3261E">✖ ${esc(e.message)}</div>`;
+    res.innerHTML = `<div class="hint" style="margin-top:8px;color:var(--rojo)">✖ ${esc(e.message)}</div>`;
     bot.disabled = false; bot.textContent = '⬆ Reintentar';
   }
 }
@@ -1338,18 +1400,18 @@ async function cargarPosiciones(ov, p){
   try{ bs = await api(`/api/productos/${p.id}/bodegas`); }
   catch(e){ zona.textContent = 'no se pudo cargar'; return; }
   if(!bs.length){
-    zona.innerHTML = `<span style="color:#8A8886">Este producto todavía no tiene
+    zona.innerHTML = `<span style="color:var(--tenue)">Este producto todavía no tiene
       bodegas asignadas — use <b>🔢 Fijar stock</b> para repartirlo y ahí podrá
       ponerle la posición.</span>`;
     return;
   }
   zona.innerHTML = bs.map(b => `
     <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
-      <span style="flex:2;color:#252423">${esc(b.bodega)}
-        <span style="color:#8A8886">(${fmt(b.cantidad)} u.)</span></span>
+      <span style="flex:2;color:var(--texto)">${esc(b.bodega)}
+        <span style="color:var(--tenue)">(${fmt(b.cantidad)} u.)</span></span>
       <input class="p-pos" data-bodega="${esc(b.bodega)}" value="${esc(b.posicion || '')}"
              placeholder="A1" maxlength="20"
-             style="flex:1;text-transform:uppercase;padding:3px 6px;border:1px solid #C8C6C4;border-radius:3px">
+             style="flex:1;text-transform:uppercase;padding:3px 6px;border:1px solid var(--borde-campo);border-radius:3px">
     </div>`).join('');
 }
 /* Lo ÚNICO que un vendedor puede cambiar: las referencias aplicables.
@@ -1375,11 +1437,11 @@ async function guardarRefsVendedor(ov, p, btn){
    Se calcula con las unidades VENDIDAS en los últimos meses (los ajustes y
    las importaciones no cuentan). Los límites se cambian en ⚙ Configuración. */
 const ROTACION = {
-  alta:  {t:'ALTA ROTACIÓN',  color:'#1F7A44', fondo:'#EAF6EE', icono:'📈',
+  alta:  {t:'ALTA ROTACIÓN',  color:'var(--verde)', fondo:'var(--rot-alta)', icono:'📈',
           d:'Mucha demanda. Mantener buen stock y en sitio de fácil acceso.'},
-  media: {t:'MEDIA ROTACIÓN', color:'#C9930A', fondo:'#FDF6E3', icono:'📊',
+  media: {t:'MEDIA ROTACIÓN', color:'var(--ambar)', fondo:'var(--aviso)', icono:'📊',
           d:'Demanda moderada. Revisar el nivel de existencias de vez en cuando.'},
-  baja:  {t:'BAJA ROTACIÓN',  color:'#B3261E', fondo:'#FDECEA', icono:'📉',
+  baja:  {t:'BAJA ROTACIÓN',  color:'var(--rojo)', fondo:'var(--rot-baja)', icono:'📉',
           d:'Poca salida. Revisar precio, promoción o moverlo de bodega.'},
 };
 function rotDe(p){ return ROTACION[p && p.rotacion] || ROTACION.baja; }
@@ -1408,7 +1470,7 @@ function semaforoGrande(p){
   const luces = niveles.map(n => {
     const enc = n === (p.rotacion || 'baja');
     return `<div style="width:26px;height:26px;border-radius:50%;margin:4px auto;
-      background:${enc ? ROTACION[n].color : '#DDDBD9'};
+      background:${enc ? ROTACION[n].color : 'var(--apagado)'};
       box-shadow:${enc ? '0 0 9px ' + ROTACION[n].color : 'none'}"></div>`;
   }).join('');
   return `<div style="border:2px solid ${r.color};background:${r.fondo};
@@ -1418,8 +1480,8 @@ function semaforoGrande(p){
       <div style="min-width:0">
         <div style="font-size:15px;font-weight:800;color:${r.color};line-height:1.15">
           ${r.icono} ${r.t}</div>
-        <div style="font-size:11.5px;color:#4C4A48;margin-top:3px">${r.d}</div>
-        <div style="font-size:11px;color:#8A8886;margin-top:3px">
+        <div style="font-size:11.5px;color:var(--texto2);margin-top:3px">${r.d}</div>
+        <div style="font-size:11px;color:var(--tenue);margin-top:3px">
           ${p.rotacion_manual
             ? '✋ puesta a mano (no cambia sola)'
             : fmt(p.vendidos || 0) + ' unidad(es) vendida(s) en el periodo'}</div>
@@ -1439,7 +1501,7 @@ function semaforoChico(p){
   const luces = niveles.map(n => {
     const enc = n === (p.rotacion || 'baja');
     return `<span style="display:inline-block;width:13px;height:13px;border-radius:50%;
-      margin:0 2px;background:${enc ? ROTACION[n].color : '#DDDBD9'};
+      margin:0 2px;background:${enc ? ROTACION[n].color : 'var(--apagado)'};
       box-shadow:${enc ? '0 0 6px ' + ROTACION[n].color : 'none'}"></span>`;
   }).join('');
   return `<div style="border:2px solid ${r.color};background:${r.fondo};
@@ -1507,10 +1569,10 @@ function infoProducto(){
   const p = selProd(); if(!p) return;
   const prov = proveedores.find(x => x.codigo === p.proveedor);
   const fila = (n, v) => `<tr>
-    <td style="padding:3px 12px 3px 0;color:#5A5856;font-weight:600;white-space:nowrap;vertical-align:top">${n}</td>
+    <td style="padding:3px 12px 3px 0;color:var(--texto2);font-weight:600;white-space:nowrap;vertical-align:top">${n}</td>
     <td style="padding:3px 0;word-break:break-word">${v || '—'}</td></tr>`;
   const ov = modal(`ℹ️ Información — ${esc(p.sku)}`, `
-    <div style="font-size:15px;font-weight:700;color:#252423">${esc(p.nombre)}</div>
+    <div style="font-size:15px;font-weight:700;color:var(--texto)">${esc(p.nombre)}</div>
     <table style="border-collapse:collapse;font-size:12.5px;width:100%">
       ${fila('Referencia (SKU)', `<span class="mono">${esc(p.sku)}</span>`)}
       ${fila('Ref. fábrica (OEM)', esc(p.oem))}
@@ -1523,30 +1585,30 @@ function infoProducto(){
       ${fila('📍 Posición', `<span id="i-pos">cargando…</span>`)}
       ${fila('Etiquetas RFID', fmt(p.n_tags) + ' asociada(s)')}
     </table>
-    <div style="font-size:12px;color:#5A5856;font-weight:600">Referencias aplicables
+    <div style="font-size:12px;color:var(--texto2);font-weight:600">Referencias aplicables
       ${MODO === 'vendedor' ? `<span class="hint" style="font-weight:400">— puedes
         corregirlas y guardar con el botón de abajo</span>` : ''}</div>
     ${MODO === 'vendedor'
       ? `<textarea id="i-refs-edit" style="width:100%;height:110px;box-sizing:border-box;
-              background:#FFFFFF;border:1px solid #C8C6C4;border-radius:4px;padding:6px 8px;
+              background:#FFFFFF;border:1px solid var(--borde-campo);border-radius:4px;padding:6px 8px;
               font-size:11.5px;margin-top:-6px;resize:vertical"
               placeholder="cargando…"></textarea>`
       : `<div id="i-refs" style="max-height:110px;overflow:auto;white-space:pre-wrap;word-break:break-word;
-              background:#FBFAF9;border:1px solid #E7E5E3;border-radius:4px;padding:6px 8px;
+              background:var(--caja2);border:1px solid var(--borde2);border-radius:4px;padding:6px 8px;
               font-size:11.5px;margin-top:-6px">cargando…</div>`}
     <div class="fila2" style="align-items:start">
       <div>
         <div class="hint" style="margin:0 0 3px;text-align:center">📷 Foto</div>
-        <img id="i-foto" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
+        <img id="i-foto" style="width:100%;border:1px solid var(--borde);border-radius:6px;display:none">
         <div class="hint" id="i-foto-msg" style="text-align:center">buscando…</div>
         <div id="i-rot" style="margin-top:8px">${semaforoGrande(p)}</div>
       </div>
       <div>
         <div class="hint" style="margin:0 0 3px;text-align:center">🏷️ Etiqueta código</div>
-        <img id="i-prev-cb" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
+        <img id="i-prev-cb" style="width:100%;border:1px solid var(--borde);border-radius:6px;display:none">
         <div class="hint" id="i-prev-cb-msg" style="text-align:center">generando…</div>
         <div class="hint" style="margin:6px 0 3px;text-align:center">📝 Etiqueta descripción</div>
-        <img id="i-prev-desc" style="width:100%;border:1px solid #E1DFDD;border-radius:6px;display:none">
+        <img id="i-prev-desc" style="width:100%;border:1px solid var(--borde);border-radius:6px;display:none">
         <div class="hint" id="i-prev-desc-msg" style="text-align:center">generando…</div>
       </div>
     </div>`,
@@ -1576,9 +1638,9 @@ function infoProducto(){
       const conPos = bs.filter(b => b.posicion);
       ep.innerHTML = conPos.length
         ? conPos.map(b => `<b style="color:#B24B00">${esc(b.posicion)}</b>` +
-                          (bs.length > 1 ? ` <span style="color:#8A8886">(${esc(b.bodega)})</span>` : ''))
+                          (bs.length > 1 ? ` <span style="color:var(--tenue)">(${esc(b.bodega)})</span>` : ''))
                 .join('  ·  ')
-        : '<span style="color:#8A8886">sin posición asignada</span>';
+        : '<span style="color:var(--tenue)">sin posición asignada</span>';
     }
   }).catch(() => {});
   const foto = ov.querySelector('#i-foto'), fmsg = ov.querySelector('#i-foto-msg');
@@ -1624,7 +1686,7 @@ function ajustar(delta){
   // al RESTAR se pregunta el motivo: solo las VENTAS cuentan en «más vendidos»
   modal('Restar 1 — ' + esc(p.sku),
     `<div class="hint">${esc(p.nombre)} · stock actual: <b>${fmt(p.cantidad_esperada)}</b></div>
-     <div style="font-size:13.5px;color:#252423">¿Por qué sale esta unidad?</div>
+     <div style="font-size:13.5px;color:var(--texto)">¿Por qué sale esta unidad?</div>
      <div class="hint">🛒 <b>Venta</b> cuenta en «🏆 Más vendidos». ·
      🔧 <b>Solo ajuste</b> (corrección, daño, préstamo…) no cuenta.</div>`,
     [{t:'Cancelar'},
@@ -1651,7 +1713,7 @@ async function fijarCantidad(){
   if(!bod.length) bod = [{bodega: p.ubicacion || '', cantidad: p.cantidad_esperada}];
   modal('Fijar stock — ' + esc(p.sku),
     `<div class="hint">${esc(p.nombre)}</div>
-     <div style="font-size:12px;color:#5A5856;font-weight:600;margin-top:6px">Existencias por bodega</div>
+     <div style="font-size:12px;color:var(--texto2);font-weight:600;margin-top:6px">Existencias por bodega</div>
      <div id="f-bodegas">${bod.map(filaBodegaHtml).join('')}</div>
      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
        <button class="btn mini" type="button" onclick="agregarFilaBodega()">➕ Otra bodega</button>
@@ -1686,12 +1748,12 @@ function imprimirSel(){
   const ov = modal('Imprimir etiquetas — ' + esc(p.sku),
     `<div class="hint">${esc(p.nombre)}</div>
      <label>Número de etiquetas<input id="f-cop" type="number" min="1" value="1"></label>
-     <div style="font-size:12px;font-weight:600;color:#5A5856;margin-top:8px">🏷️ Código de barras</div>
+     <div style="font-size:12px;font-weight:600;color:var(--texto2);margin-top:8px">🏷️ Código de barras</div>
      <div style="display:flex;gap:6px;margin-top:2px">
        <button class="btn prim" id="b-cbz" style="flex:1">🖨 En la Zebra (con chip)</button>
        <button class="btn" id="b-cbs" style="flex:1">🏷️ En la SAT</button>
      </div>
-     <div style="font-size:12px;font-weight:600;color:#5A5856;margin-top:10px">📝 Descripción</div>
+     <div style="font-size:12px;font-weight:600;color:var(--texto2);margin-top:10px">📝 Descripción</div>
      <div style="display:flex;gap:6px;margin-top:2px">
        <button class="btn prim" id="b-dz" style="flex:1">🖨 En la Zebra (con chip)</button>
        <button class="btn" id="b-ds" style="flex:1">📝 En la SAT</button>
@@ -1743,7 +1805,7 @@ async function verSesiones(){
           <td class="num">${fmt(s.n)}</td><td>${fecha(s.creada)}</td>
           <td><button class="btn mini rojo" title="Borrar esta sesión"
               onclick="event.stopPropagation();eliminarSesion(${s.id}, ${s.n})">🗑</button></td></tr>`).join('')
-      : `<tr><td colspan="7" style="text-align:center;color:#8A8886;padding:34px">
+      : `<tr><td colspan="7" style="text-align:center;color:var(--tenue);padding:34px">
            Aún no hay sesiones — crea una con «Nueva sesión»</td></tr>`;
     bcont(`${fmt(sesiones.length)} sesiones de conteo`);
   }catch(e){ toast('✖ ' + e.message); }
@@ -2004,8 +2066,8 @@ function grafBarras(prods){
     <div style="display:flex;align-items:center;gap:10px;margin-top:${i ? 7 : 0}px">
       <div style="width:230px;flex:none;text-align:right;font-size:12px;overflow:hidden;
                   text-overflow:ellipsis;white-space:nowrap" title="${esc(p.sku + ' — ' + p.nombre)}">
-        <b>${esc(p.sku)}</b> <span style="color:#5A5856">${esc(p.nombre)}</span></div>
-      <div style="flex:1;background:#F3F2F1;border-radius:4px">
+        <b>${esc(p.sku)}</b> <span style="color:var(--texto2)">${esc(p.nombre)}</span></div>
+      <div style="flex:1;background:var(--caja);border-radius:4px">
         <div style="width:${Math.max(3, p.unidades / max * 100)}%;background:#E87722;
                     color:#fff;font-size:12px;font-weight:700;padding:4px 8px;
                     white-space:nowrap;border-radius:4px;box-sizing:border-box">${fmt(p.unidades)}</div>
@@ -2016,17 +2078,17 @@ function grafColumnas(prods){
   const top = prods.slice(0, 12);
   const max = top[0].unidades || 1;
   return `<div style="display:flex;align-items:flex-end;gap:10px;height:250px;
-                      border-bottom:1.5px solid #E1DFDD;padding:0 8px">
+                      border-bottom:1.5px solid var(--borde);padding:0 8px">
     ${top.map(p => `
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
                   justify-content:flex-end;height:100%" title="${esc(p.sku + ' — ' + p.nombre + ': ' + fmt(p.unidades))}">
-        <div style="font-size:11.5px;font-weight:700;color:#252423">${fmt(p.unidades)}</div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--texto)">${fmt(p.unidades)}</div>
         <div style="width:68%;max-width:46px;height:${Math.max(4, p.unidades / max * 195)}px;
                     background:#E87722;border-radius:4px 4px 0 0;margin-top:3px"></div>
       </div>`).join('')}
   </div>
   <div style="display:flex;gap:10px;padding:4px 8px 0">
-    ${top.map(p => `<div style="flex:1;min-width:0;text-align:center;font-size:10.5px;color:#5A5856;
+    ${top.map(p => `<div style="flex:1;min-width:0;text-align:center;font-size:10.5px;color:var(--texto2);
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.sku)}">${esc(p.sku)}</div>`).join('')}
   </div>`;
 }
@@ -2034,7 +2096,7 @@ function grafTorta(prods){
   const top = prods.slice(0, 8);
   const resto = prods.slice(8).reduce((a, p) => a + p.unidades, 0);
   const datos = top.map((p, i) => ({n: p.sku, det: p.nombre, v: p.unidades, c: PAL_CAT[i]}));
-  if(resto) datos.push({n: 'Otros', det: prods.length - 8 + ' productos más', v: resto, c: '#8A8886'});
+  if(resto) datos.push({n: 'Otros', det: prods.length - 8 + ' productos más', v: resto, c: 'var(--tenue)'});
   const sum = datos.reduce((a, x) => a + x.v, 0) || 1;
   const R = 118, cx = 128, cy = 128;
   let ang = -Math.PI / 2, trozos = '';
@@ -2062,7 +2124,7 @@ function grafTorta(prods){
              title="${esc(x.det)}">
           <span style="width:13px;height:13px;border-radius:3px;background:${x.c};flex:none"></span>
           <b>${esc(x.n)}</b>
-          <span style="color:#5A5856;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(x.det)}</span>
+          <span style="color:var(--texto2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(x.det)}</span>
           <span style="flex:none"><b>${fmt(x.v)}</b> · ${Math.round(x.v / sum * 100)}%</span>
         </div>`).join('')}
     </div>
@@ -2079,8 +2141,8 @@ function grafLinea(serie){
   const paso = Math.ceil(serie.length / 14);   // que las etiquetas no se amontonen
   const rejilla = [0, 0.5, 1].map(f => {
     const v = Math.round(max * f), y = py(v);
-    return `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" stroke="#EDEBE9" stroke-width="1"/>
-            <text x="${mL - 7}" y="${y + 4}" text-anchor="end" font-size="11" fill="#8A8886">${fmt(v)}</text>`;
+    return `<line x1="${mL}" y1="${y}" x2="${W - mR}" y2="${y}" stroke="var(--borde2)" stroke-width="1"/>
+            <text x="${mL - 7}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--tenue)">${fmt(v)}</text>`;
   }).join('');
   const puntos = serie.map((s, i) => `
     <circle cx="${px(i).toFixed(1)}" cy="${py(s.unidades).toFixed(1)}" r="4"
@@ -2088,7 +2150,7 @@ function grafLinea(serie){
       <title>${esc(s.etiqueta)}: ${fmt(s.unidades)} unidades</title></circle>`).join('');
   const etiquetas = serie.map((s, i) => i % paso ? '' : `
     <text x="${px(i).toFixed(1)}" y="${H - 8}" text-anchor="middle"
-          font-size="11" fill="#5A5856">${esc(s.etiqueta)}</text>`).join('');
+          font-size="11" fill="var(--texto2)">${esc(s.etiqueta)}</text>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:290px;font-family:'Segoe UI',Arial">
     ${rejilla}
     <polyline points="${pts}" fill="none" stroke="#E87722" stroke-width="2"
@@ -2107,7 +2169,7 @@ async function verVentas(){
     const j = await api('/api/estadisticas/ventas?periodo=' + vtaPeriodo);
     const nom = {dia:'hoy', mes:'este mes', ano:'este año'}[j.periodo] || '';
     if(!j.productos.length){
-      cuerpo.innerHTML = `<div style="text-align:center;color:#8A8886;padding:60px 20px;font-size:14px">
+      cuerpo.innerHTML = `<div style="text-align:center;color:var(--tenue);padding:60px 20px;font-size:14px">
         Aún no hay ventas registradas ${nom}.<br><br>
         <span class="hint">Cuando el stock de un producto baja con <b>Restar 1</b> o
         <b>Fijar stock</b>, el programa pregunta si fue 🛒 venta o 🔧 solo ajuste:
@@ -2122,20 +2184,20 @@ async function verVentas(){
       vtaTipo === 'linea'    ? grafLinea(j.serie) :
                                grafBarras(j.productos);
     cuerpo.innerHTML = `
-      <div style="font-size:13px;color:#5A5856;margin-bottom:14px">
-        <b style="font-size:17px;color:#252423">${fmt(j.total_unidades)}</b> unidades salieron ${nom}
+      <div style="font-size:13px;color:var(--texto2);margin-bottom:14px">
+        <b style="font-size:17px;color:var(--texto)">${fmt(j.total_unidades)}</b> unidades salieron ${nom}
         · ${fmt(j.productos.length)} producto(s) con movimiento</div>
       ${grafica}
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:24px">
-        <thead><tr style="color:#5A5856;text-align:left">
+        <thead><tr style="color:var(--texto2);text-align:left">
           <th style="padding:6px;width:34px">#</th><th style="padding:6px;width:130px">Código</th>
           <th style="padding:6px">Nombre</th>
           <th style="padding:6px;text-align:right;width:120px">Unidades vendidas</th>
           <th style="padding:6px;text-align:right;width:70px">Veces</th>
           <th style="padding:6px;text-align:right;width:95px">Stock actual</th></tr></thead>
         <tbody>${j.productos.map((p, i) => `
-          <tr style="border-top:1px solid #EDEBE9">
-            <td style="padding:6px;color:#8A8886">${i + 1}</td>
+          <tr style="border-top:1px solid var(--borde2)">
+            <td style="padding:6px;color:var(--tenue)">${i + 1}</td>
             <td style="padding:6px" class="mono">${esc(p.sku)}</td>
             <td style="padding:6px">${esc(p.nombre)}</td>
             <td style="padding:6px;text-align:right"><b>${fmt(p.unidades)}</b></td>
@@ -2163,7 +2225,7 @@ async function verDesconocidos(){
           <td class="num">${fmt(r.veces)}</td><td>${fecha(r.ultima)}</td>
           <td><button class="btn mini prim" onclick="asignarDesc('${esc(r.epc)}')">Asignar</button>
               <button class="btn mini" onclick="ignorarDesc('${esc(r.epc)}')">Ignorar</button></td></tr>`).join('')
-      : `<tr><td colspan="4" style="text-align:center;color:#8A8886;padding:34px">
+      : `<tr><td colspan="4" style="text-align:center;color:var(--tenue);padding:34px">
            No hay etiquetas desconocidas 🎉</td></tr>`;
     badgeDesc(rows.length);
     bcont(`${fmt(rows.length)} etiquetas desconocidas`);
@@ -2212,13 +2274,13 @@ async function cargarPistolas(){
   try{
     const p = await api('/api/balizas/pistolas');
     if(!p.length){
-      caja.style.background = '#FDF6E3'; caja.style.borderColor = '#E8D9A0';
+      caja.style.background = 'var(--aviso)'; caja.style.borderColor = 'var(--aviso-borde)';
       caja.innerHTML = `⚠️ <b>Ninguna pistola ha leído una baliza todavía.</b>
         <span class="hint">Mientras esto siga así no puede haber propuestas: hay que
         apuntar la pistola a la etiqueta de la baliza y disparar antes de leer el estante.</span>`;
       return;
     }
-    caja.style.background = '#EAF6EE'; caja.style.borderColor = '#BFE3CC';
+    caja.style.background = 'var(--rot-alta)'; caja.style.borderColor = '#BFE3CC';
     caja.innerHTML = '📍 ' + p.map(x =>
       `<b>${esc(x.dispositivo)}</b> en ${esc(x.bodega)} / <b>${esc(x.posicion)}</b>
        <span class="hint">(${x.minutos === 0 ? 'hace un momento' : 'hace ' + fmt(x.minutos) + ' min'}${
@@ -2237,7 +2299,7 @@ async function cargarBalizas(){
           <td class="num">${fmt(b.situadas)}</td>
           <td><button class="btn mini" onclick="borrarBaliza('${esc(b.epc)}')">Quitar</button></td>
         </tr>`).join('')
-      : `<tr><td colspan="4" style="text-align:center;color:#8A8886;padding:30px">
+      : `<tr><td colspan="4" style="text-align:center;color:var(--tenue);padding:30px">
            Todavía no hay balizas.<br><span class="hint">Pega una etiqueta en el estante,
            léela con la pistola y dale a «Nueva baliza».</span></td></tr>`;
     bcont(`${fmt(rows.length)} balizas`);
@@ -2270,7 +2332,7 @@ async function cargarPropuestas(){
                 <span class="hint">${fmt(p.veces)}</span></td>
           </tr>`;
         }).join('')
-      : `<tr><td colspan="6" style="text-align:center;color:#8A8886;padding:30px">
+      : `<tr><td colspan="6" style="text-align:center;color:var(--tenue);padding:30px">
            Sin propuestas todavía.<br><span class="hint">Abre un conteo, lee una baliza
            con la pistola y sigue leyendo los repuestos de ese estante.</span></td></tr>`;
   }catch(e){ toast('✖ ' + e.message); }
@@ -2344,7 +2406,7 @@ async function imprimirBalizas(){
        <label style="flex:1">Números — desde<select id="f-bi-n1">${opNums(1, 99)}</select></label>
        <label style="flex:1">hasta<select id="f-bi-n2">${opNums(10, 99)}</select></label>
      </div>
-     <div id="bi-resumen" style="margin-top:12px;background:#F3F2F1;border:1px solid #E1DFDD;
+     <div id="bi-resumen" style="margin-top:12px;background:var(--caja);border:1px solid var(--borde);
           border-radius:6px;padding:10px;line-height:1.6">Calculando…</div>`,
     [{t:'Cancelar'}, {t:'🖨️ Imprimir', p:1, f:async (ov, btn) => {
       const d = datosBI(ov);
@@ -2383,10 +2445,10 @@ async function resumenBI(ov){
       <br><b>${fmt(j.nuevas)}</b> nuevas` +
       (j.reimpresas ? ` · <b>${fmt(j.reimpresas)}</b> ya existían y se reimprimen con su mismo chip
         <span class="hint">(sirve para reemplazar una etiqueta rota)</span>` : '') +
-      (j.total > 40 ? `<div style="color:#B3261E;margin-top:6px">⚠️ Son bastantes:
+      (j.total > 40 ? `<div style="color:var(--rojo);margin-top:6px">⚠️ Son bastantes:
         asegúrate de tener rollo suficiente.</div>` : '');
   }catch(e){
-    caja.innerHTML = `<span style="color:#B3261E">${esc(e.message)}</span>`;
+    caja.innerHTML = `<span style="color:var(--rojo)">${esc(e.message)}</span>`;
   }
 }
 
@@ -2412,7 +2474,7 @@ function aplicarPropuestas(){
   if(!cambios.length){ toast('No hay nada marcado'); return; }
   modal('Guardar posiciones',
     `<p>Se van a guardar <b>${cambios.length}</b> posiciones tal como quedaron marcadas.</p>
-     <div style="background:#FDF6E3;border:1px solid #E8D9A0;border-radius:6px;padding:10px;line-height:1.5">
+     <div style="background:var(--aviso);border:1px solid var(--aviso-borde);border-radius:6px;padding:10px;line-height:1.5">
        ⚠️ <b>Aviso:</b> esto <b>reemplaza</b> la posición que tenían esos repuestos en esa bodega.
        Si alguna venía de la importación de Siigo, se pierde el valor anterior.
      </div>`,
@@ -2633,11 +2695,11 @@ async function explorarServidor(idCampo, modoArchivo, alElegir){
                              style="width:100%;margin-bottom:6px">` : ''}
      <div id="ec-aviso" class="hint" style="min-height:16px"></div>
      <div style="display:flex;gap:8px">
-       <div id="ec-lista" style="flex:1;height:290px;overflow:auto;border:1px solid #E1DFDD;
+       <div id="ec-lista" style="flex:1;height:290px;overflow:auto;border:1px solid var(--borde);
             border-radius:3px;background:#fff"></div>
-       ${modoArchivo ? `<div id="ec-vista" style="width:190px;height:290px;border:1px solid #E1DFDD;
-            border-radius:3px;background:#FAF9F8;display:flex;align-items:center;
-            justify-content:center;padding:6px;text-align:center;color:#8A8886;
+       ${modoArchivo ? `<div id="ec-vista" style="width:190px;height:290px;border:1px solid var(--borde);
+            border-radius:3px;background:var(--fila-par);display:flex;align-items:center;
+            justify-content:center;padding:6px;text-align:center;color:var(--tenue);
             font-size:12px">Toca una imagen<br>para verla</div>` : ''}
      </div>`,
     [{t: modoArchivo ? '✔ Usar esta foto' : '✔ Usar esta carpeta', p:true, f: (o) => {
@@ -2668,13 +2730,13 @@ async function explorarServidor(idCampo, modoArchivo, alElegir){
     const archs = datos.archivos;
     const html = datos.carpetas.map((c, i) =>
         `<div class="ec-it" data-i="${i}" style="padding:7px 10px;cursor:pointer;
-              border-bottom:1px solid #F3F2F1">${esc(c.nombre)}</div>`).join('')
+              border-bottom:1px solid var(--caja)">${esc(c.nombre)}</div>`).join('')
       + archs.map(a =>
         `<div class="ec-ar" data-ruta="${esc(a.ruta)}" style="padding:7px 10px;cursor:pointer;
-              border-bottom:1px solid #F3F2F1">🖼 ${esc(a.nombre)}</div>`).join('');
+              border-bottom:1px solid var(--caja)">🖼 ${esc(a.nombre)}</div>`).join('');
     lista.innerHTML = html || '<div class="hint" style="padding:10px">(nada que mostrar aquí)</div>';
     lista.querySelectorAll('.ec-it').forEach(el => {
-      el.onmouseenter = () => el.style.background = '#F3F2F1';
+      el.onmouseenter = () => el.style.background = 'var(--caja)';
       el.onmouseleave = () => el.style.background = '';
       el.onclick = () => ver(datos.carpetas[+el.dataset.i].ruta);
     });
@@ -2740,13 +2802,13 @@ async function revisarCodigos(){
   const filas = j.productos.map(p => `<tr>
       <td>${esc(p.sku)}</td><td>${esc(p.nombre)}</td>
       <td style="color:#A4262C">${esc(p.antes)}</td>
-      <td style="color:#107C10;font-weight:600">${esc(p.ahora)}</td></tr>`).join('');
+      <td style="color:var(--exito);font-weight:600">${esc(p.ahora)}</td></tr>`).join('');
   modal(`Revisar códigos de barras — ${j.total} desfasado(s)`,
     `<p>Estos productos tienen guardado un código de barras que <b>ya no corresponde</b>
       a su precio o proveedor actual (por eso al buscarlos por el número impreso no aparecen).</p>
-     <div style="max-height:320px;overflow:auto;border:1px solid #E1DFDD;border-radius:3px">
+     <div style="max-height:320px;overflow:auto;border:1px solid var(--borde);border-radius:3px">
        <table style="width:100%;border-collapse:collapse;font-size:12px">
-         <thead><tr style="background:#F3F2F1;position:sticky;top:0">
+         <thead><tr style="background:var(--caja);position:sticky;top:0">
            <th style="text-align:left;padding:5px">Código</th>
            <th style="text-align:left;padding:5px">Nombre</th>
            <th style="text-align:left;padding:5px">Guardado (viejo)</th>
@@ -2846,9 +2908,9 @@ function htmlPropiedades(){
   const k = disSel, d = diseno[k], meta = elemMeta(k);
   const num = (prop, nom, paso) => d[prop] === undefined ? '' : `
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">${nom}</span>
+      <span style="width:64px;flex:none;color:var(--texto2)">${nom}</span>
       <input type="number" step="${paso || 0.5}" value="${Math.round(d[prop] * 10) / 10}"
-             style="width:72px;padding:3px 6px;border:1px solid #C8C6C4;border-radius:3px"
+             style="width:72px;padding:3px 6px;border:1px solid var(--borde-campo);border-radius:3px"
              onchange="guardaUndo(1);diseno['${k}'].${prop}=+this.value;dibujarEtiqueta()">
     </div>`;
   let h = `<div style="font-weight:600;font-size:12px;color:#C25705">${meta.n}</div>`;
@@ -2859,8 +2921,8 @@ function htmlPropiedades(){
   if(d.grosor !== undefined) h += num('grosor', 'Grosor', 1);
   if(d.s !== undefined && meta.tipo !== 'codigo') h += `
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">Fuente</span>
-      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+      <span style="width:64px;flex:none;color:var(--texto2)">Fuente</span>
+      <select style="padding:3px;border:1px solid var(--borde-campo);border-radius:3px;flex:1"
               onchange="guardaUndo(1);diseno['${k}'].fuente=this.value;dibujarEtiqueta();construirPanelDiseno()">
         ${[['', disTab === 'desc' ? 'Arial Narrow negrita (automática)' : 'Impresora (original, negrita)'],
            ['arialn','Arial Narrow (la original delgada)'],
@@ -2881,8 +2943,8 @@ function htmlPropiedades(){
         <i>Cursiva</i></label>
     </div>` : ''}
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">Estilo</span>
-      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+      <span style="width:64px;flex:none;color:var(--texto2)">Estilo</span>
+      <select style="padding:3px;border:1px solid var(--borde-campo);border-radius:3px;flex:1"
               onchange="guardaUndo(1);diseno['${k}'].letra=this.value;dibujarEtiqueta()">
         ${[['','Normal'],['estrecha','Letra estrecha'],['ancha','Letra ancha']].map(([v, n]) =>
           `<option value="${v}" ${(d.letra || '') === v ? 'selected' : ''}>${n}</option>`).join('')}
@@ -2898,8 +2960,8 @@ function htmlPropiedades(){
              onchange="guardaUndo(1);diseno.codigo.numeros=this.checked;dibujarEtiqueta()">
       Números debajo de las barras</label>
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">Fuente nº</span>
-      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+      <span style="width:64px;flex:none;color:var(--texto2)">Fuente nº</span>
+      <select style="padding:3px;border:1px solid var(--borde-campo);border-radius:3px;flex:1"
               onchange="guardaUndo(1);diseno.codigo.fuente_num=this.value;dibujarEtiqueta()">
         ${[['arial','Arial (limpia)'],['arialn','Arial delgada'],['arialbd','Arial negrita'],
            ['consolas','Consolas (pareja)'],['ocr','OCR (máquina)'],['segoe','Segoe UI'],
@@ -2907,22 +2969,22 @@ function htmlPropiedades(){
           `<option value="${v}" ${(d.fuente_num || 'arial') === v ? 'selected' : ''}>${n}</option>`).join('')}
       </select></div>
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">Tamaño nº</span>
+      <span style="width:64px;flex:none;color:var(--texto2)">Tamaño nº</span>
       <input type="number" step="2" min="0" max="120" value="${d.num_s || ''}" placeholder="auto"
-             style="width:72px;padding:3px 6px;border:1px solid #C8C6C4;border-radius:3px"
+             style="width:72px;padding:3px 6px;border:1px solid var(--borde-campo);border-radius:3px"
              onchange="guardaUndo(1);diseno.codigo.num_s=Math.max(0,+this.value||0);dibujarEtiqueta()">
       <span class="hint">vacío = auto</span></div>
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">Barras</span>
-      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px;flex:1"
+      <span style="width:64px;flex:none;color:var(--texto2)">Barras</span>
+      <select style="padding:3px;border:1px solid var(--borde-campo);border-radius:3px;flex:1"
               onchange="guardaUndo(1);diseno.codigo.barras=this.value;dibujarEtiqueta()">
         ${[['fino','Finas'],['','Normales'],['grueso','Gruesas']].map(([v, n]) =>
           `<option value="${v}" ${(d.barras || '') === v ? 'selected' : ''}>${n}</option>`).join('')}
       </select></div>`;
   if(k === 'nombre') h += `
     <div style="display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11.5px">
-      <span style="width:64px;flex:none;color:#5A5856">Líneas</span>
-      <select style="padding:3px;border:1px solid #C8C6C4;border-radius:3px"
+      <span style="width:64px;flex:none;color:var(--texto2)">Líneas</span>
+      <select style="padding:3px;border:1px solid var(--borde-campo);border-radius:3px"
               onchange="guardaUndo(1);diseno.nombre.lineas=+this.value;dibujarEtiqueta()">
         ${[[0,'Automático'],[1,'1'],[2,'2'],[3,'3'],[4,'4']].map(([v, n]) =>
           `<option value="${v}" ${(+d.lineas || 0) === v ? 'selected' : ''}>${n}</option>`).join('')}
@@ -2936,12 +2998,12 @@ function htmlPropiedades(){
   if(k === 'foto'){
     const pd = productoDiseno();
     h += `
-    <div style="margin-top:8px;font-size:11.5px;color:#5A5856">Archivo de la foto de
+    <div style="margin-top:8px;font-size:11.5px;color:var(--texto2)">Archivo de la foto de
       <b>${esc(pd ? pd.sku : '¿?')}</b>:</div>
     <div style="display:flex;gap:5px;margin-top:2px">
       <input id="dis-foto-ruta" value="${esc(pd && pd.foto || '')}"
              placeholder="se busca sola en la carpeta de fotos"
-             style="flex:1;min-width:0;padding:4px 7px;border:1px solid #C8C6C4;border-radius:3px;font-size:11px"
+             style="flex:1;min-width:0;padding:4px 7px;border:1px solid var(--borde-campo);border-radius:3px;font-size:11px"
              onchange="guardarFotoProducto(this.value.trim())">
       <button class="btn mini" onclick="elegirFotoDiseno()" title="Buscar el archivo en el PC">📂</button>
     </div>
@@ -2949,8 +3011,8 @@ function htmlPropiedades(){
     este producto. Déjalo vacío para que se busque sola otra vez.</div>`;
   }
   if(meta.editable) h += `
-    <div style="margin-top:7px;font-size:11.5px;color:#5A5856">Texto que se imprime:</div>
-    <input value="${esc(d.texto || '')}" style="width:100%;padding:4px 7px;border:1px solid #C8C6C4;border-radius:3px;margin-top:2px"
+    <div style="margin-top:7px;font-size:11.5px;color:var(--texto2)">Texto que se imprime:</div>
+    <input value="${esc(d.texto || '')}" style="width:100%;padding:4px 7px;border:1px solid var(--borde-campo);border-radius:3px;margin-top:2px"
            onchange="guardaUndo(1);diseno['${k}'].texto=this.value;dibujarEtiqueta()">`;
   h += `<div style="display:flex;gap:5px;margin-top:9px">
     <button class="btn mini" onclick="centrarElemento('${k}')">Centrar ↔</button>
@@ -3191,8 +3253,8 @@ function dibujarEtiqueta(desdeRender){
     }else if(t === 'caja'){
       css += `width:${d.ancho}%;height:${d.alto}%;`;
       el.innerHTML = k === 'foto'
-        ? `<div class="di-cont" style="width:100%;height:100%;border:1.5px dashed #B5B2AF;
-             display:flex;align-items:center;justify-content:center;font-size:24px;color:#B5B2AF">📷</div>`
+        ? `<div class="di-cont" style="width:100%;height:100%;border:1.5px dashed var(--tenue);
+             display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--tenue)">📷</div>`
         : `<div class="di-cont" style="width:100%;height:100%;border:${Math.max(1, (d.grosor || 2) * esc)}px solid #000"></div>`;
     }else if(t === 'codigo'){
       const cb = (p.codigo_barras || '').trim();
@@ -3425,7 +3487,7 @@ async function previewReal(){
     }
     const url = URL.createObjectURL(await r.blob());
     ov.querySelector('.m-cuerpo div').innerHTML =
-      `<img src="${url}" style="max-width:100%;border:1px solid #E1DFDD;border-radius:8px">
+      `<img src="${url}" style="max-width:100%;border:1px solid var(--borde);border-radius:8px">
        <div class="hint" style="margin-top:6px">${disTab === 'desc'
          ? 'Así saldrá por la impresora SAT (dibujada aquí mismo, sin internet).'
          : 'Imagen generada por internet con el motor real de impresión (ZPL).'}</div>`;
@@ -3538,10 +3600,10 @@ async function probarImpresora(id, btn){
   btn.disabled = true; msg.textContent = 'Enviando…'; msg.style.color = '';
   try{
     const j = await api('/api/impresora/probar', {tipo: id === 'zeb' ? 'zebra' : 'sat'});
-    msg.style.color = '#1F7A44'; msg.textContent = '✔ enviada ' + j.ruta;
+    msg.style.color = 'var(--verde)'; msg.textContent = '✔ enviada ' + j.ruta;
     toast('✔ ' + j.msg);
   }catch(e){
-    msg.style.color = '#B3261E'; msg.textContent = '✖ ' + e.message;
+    msg.style.color = 'var(--rojo)'; msg.textContent = '✖ ' + e.message;
   }
   btn.disabled = false;
 }
@@ -3591,7 +3653,7 @@ async function configUI(){
          <button class="btn" type="button" onclick="elegirCarpeta('c-fotos')"
                  title="Buscar la carpeta en el PC servidor (funciona desde cualquier equipo)">📂 Buscar…</button>
        </span></label>
-     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+     <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:12px 0 2px">
        IMPRESORA SAT — ETIQUETAS DE DESCRIPCIÓN (sin chip)</div>
      ${bloqueConexion('sat', 'SAT', c.sat_salida)}
      <div class="fila2">
@@ -3643,9 +3705,9 @@ async function configUI(){
            <option value="ambas" ${c.sat_lado === 'ambas' ? 'selected' : ''}>Ambas (repite en las dos, no desperdicia)</option>
          </select></label>
      </div>
-     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+     <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:12px 0 2px">
        ACTUALIZACIONES DEL PROGRAMA</div>
-     <div id="c-upd-caja" style="background:#F3F2F1;border:1px solid #E1DFDD;border-radius:6px;
+     <div id="c-upd-caja" style="background:var(--caja);border:1px solid var(--borde);border-radius:6px;
           padding:9px 12px;line-height:1.6;margin-bottom:6px">Versión instalada: <b>—</b></div>
      <label class="chk"><input type="checkbox" id="c-upd-rev" ${c.actualizar_revisar !== false ? 'checked' : ''}>
        Avisar cuando salga una versión nueva</label>
@@ -3660,7 +3722,7 @@ async function configUI(){
      <div class="hint" style="margin-bottom:8px;line-height:1.5">Antes de actualizar se guarda
        una copia del inventario, y la versión anterior queda junto al programa por si hubiera
        que volver atrás. Los otros PCs no necesitan nada: cogen lo nuevo del servidor solos.</div>
-     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+     <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:12px 0 2px">
        COPIA DE SEGURIDAD (respaldo de los datos)</div>
      <label class="chk"><input type="checkbox" id="c-resp" ${c.respaldo_activo !== false ? 'checked' : ''}>
        Hacer una copia automática cada día</label>
@@ -3677,7 +3739,7 @@ async function configUI(){
          <button class="btn" type="button" onclick="elegirCarpeta('c-resp-carp')"
                  title="Buscar la carpeta en el PC servidor (funciona desde cualquier equipo)">📂 Buscar…</button>
        </span></label>
-     <div style="font-weight:700;font-size:11px;color:#8A8886;letter-spacing:.5px;margin:12px 0 2px">
+     <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:12px 0 2px">
        🚦 SEMÁFORO DE ROTACIÓN (verde / ámbar / rojo)</div>
      <div class="fila2">
        <label>Se miran las ventas de los últimos (días)
@@ -3795,7 +3857,7 @@ async function pintarEstadoUpd(ov){
     if(a.hay) t += ` &nbsp;·&nbsp; <span style="color:#C25705;font-weight:700">hay la ${esc(a.nueva)} disponible</span>`;
     else if(a.revisado) t += ' &nbsp;·&nbsp; <span class="hint">está al día</span>';
     if(!a.instalable) t += '<div class="hint">Se está ejecutando desde el código, no desde el programa instalado: aquí no se actualiza solo.</div>';
-    if(a.error) t += `<div class="hint" style="color:#B3261E">${esc(a.error)}</div>`;
+    if(a.error) t += `<div class="hint" style="color:var(--rojo)">${esc(a.error)}</div>`;
     caja.innerHTML = t;
     const b = ov.querySelector('#c-upd-inst');
     if(b) b.style.display = (a.hay && a.instalable) ? '' : 'none';
@@ -3807,10 +3869,10 @@ async function buscarActualizacion(btn){
   btn.disabled = true; msg.style.color = ''; msg.textContent = 'Consultando…';
   try{
     const a = await api('/api/actualizacion/buscar', {});
-    msg.style.color = a.hay ? '#C25705' : '#1F7A44';
+    msg.style.color = a.hay ? '#C25705' : 'var(--verde)';
     msg.textContent = a.hay ? `hay la ${a.nueva}` : 'ya tienes la última';
     await pintarEstadoUpd(ov);
-  }catch(e){ msg.style.color = '#B3261E'; msg.textContent = '✖ ' + e.message; }
+  }catch(e){ msg.style.color = 'var(--rojo)'; msg.textContent = '✖ ' + e.message; }
   btn.disabled = false;
 }
 
@@ -3818,7 +3880,7 @@ function instalarActualizacion(btn){
   const ov = btn.closest('.overlay');
   modal('⬇️ Instalar la versión nueva', `
     <p>Se descarga la versión nueva y el programa <b>se reinicia solo</b>. Tarda menos de un minuto.</p>
-    <div style="background:#FDF6E3;border:1px solid #E8D9A0;border-radius:6px;padding:10px;line-height:1.5">
+    <div style="background:var(--aviso);border:1px solid var(--aviso-borde);border-radius:6px;padding:10px;line-height:1.5">
       ⚠️ Durante el reinicio la pistola y los otros PCs se quedan <b>unos segundos sin servidor</b>.
       Mejor no hacerlo en mitad de un conteo.
     </div>
@@ -3874,7 +3936,7 @@ function avisarActualizacion(a){
     modal('🆕 Hay una versión nueva', `
       <p>Está publicada la versión <b>${esc(a.nueva)}</b> (tú tienes la ${esc(a.version)}).</p>
       ${a.notas ? `<div class="hint" style="white-space:pre-wrap;max-height:190px;overflow:auto;
-         background:#F3F2F1;border-radius:6px;padding:8px;margin-top:6px">${esc(a.notas)}</div>` : ''}
+         background:var(--caja);border-radius:6px;padding:8px;margin-top:6px">${esc(a.notas)}</div>` : ''}
       <div class="hint" style="margin-top:8px">Si dejas activado «instalarla sola» en
       ⚙ Configuración, se pondrá al día cuando nadie esté leyendo con la pistola.</div>`,
       [{t:'Luego'}, {t:'Instalar ahora', p:1, f:(ov3, b3) => {
@@ -3885,6 +3947,27 @@ function avisarActualizacion(a){
       }}]);
   }
 }
+
+/* ---------------- claro / oscuro ----------------
+   La elección se guarda en ESTE PC (cada puesto puede tenerlo como quiera). */
+function temaActual(){
+  return document.documentElement.getAttribute('data-tema') || 'claro';
+}
+function pintarBotonTema(){
+  const b = document.getElementById('btn-tema');
+  if(!b) return;
+  const osc = temaActual() === 'oscuro';
+  b.textContent = osc ? '☀️' : '🌙';
+  b.title = osc ? 'Pasar a modo claro' : 'Pasar a modo oscuro';
+}
+function cambiarTema(){
+  const nuevo = temaActual() === 'oscuro' ? 'claro' : 'oscuro';
+  document.documentElement.setAttribute('data-tema', nuevo);
+  try{ localStorage.setItem('tema', nuevo); }catch(e){}
+  pintarBotonTema();
+  bmsg(nuevo === 'oscuro' ? 'Modo oscuro' : 'Modo claro');
+}
+pintarBotonTema();
 
 async function stats(){
   try{

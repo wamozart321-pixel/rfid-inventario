@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Sistema de Inventario RFID — servidor web + API
 Chainway C72 (y otros lectores) · Zebra ZT411/ZT411R (ZPL por red)
@@ -3942,7 +3942,7 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "2.3"
+VERSION = "2.4"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
 PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida

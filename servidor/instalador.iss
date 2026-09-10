@@ -1,4 +1,4 @@
-; Instalador del Sistema de Inventario RFID
+﻿; Instalador del Sistema de Inventario RFID
 ; Compilar con: ISCC.exe instalador.iss  ->  genera Instalar-InventarioRFID.exe
 ; El instalador incluye una FOTO de la base de datos y de la configuración del
 ; momento en que se compila: en un PC nuevo arranca con ese catálogo; si ya hay
@@ -6,7 +6,7 @@
 ; (para MUDAR el servidor a otro PC), que antes guarda copia de los actuales.
 
 #define MyAppName "Inventario RFID"
-#define MyAppVersion "2.3"
+#define MyAppVersion "2.4"
 #define MyAppExeName "ServidorInventarioRFID.exe"
 
 [Setup]
