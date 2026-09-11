@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Sistema de Inventario RFID — servidor web + API
 Chainway C72 (y otros lectores) · Zebra ZT411/ZT411R (ZPL por red)
@@ -3942,7 +3942,7 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "2.4"
+VERSION = "2.5"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
 PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida
@@ -3954,6 +3954,68 @@ ESTADO_ACTUALIZACION = {"version": VERSION, "hay": False, "nueva": "", "notas": 
 # cuándo llegó la última lectura de una pistola: no se actualiza a mitad de un
 # conteo, se espera a que nadie esté leyendo
 ULTIMA_LECTURA = None
+
+
+_SSL_CTX = None
+
+
+def contexto_ssl():
+    """Con qué certificados se comprueba que de verdad estamos hablando con
+    GitHub. Se confía en DOS sitios a la vez:
+
+      - la tienda de Windows, para que siga funcionando donde el antivirus o
+        la red de la empresa inspeccionan el tráfico (esos meten su propio
+        certificado ahí);
+      - la lista que trae el propio programa (certifi), porque hay equipos
+        —sobre todo los Windows Server— donde Windows todavía no se ha
+        descargado la raíz de GitHub y sin ella la comprobación falla.
+
+    Lo que NUNCA se hace es desactivar la comprobación: por aquí entra un
+    programa que se va a EJECUTAR, y sin verificar, cualquiera en la red
+    podría colar el suyo."""
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        import ssl
+        ctx = ssl.create_default_context()       # ya trae la tienda del sistema
+        try:
+            import certifi
+            ctx.load_verify_locations(certifi.where())
+        except Exception:
+            pass                                  # sin certifi queda la del sistema
+        _SSL_CTX = ctx
+    return _SSL_CTX
+
+
+def resumen_certificados():
+    """Con cuántas autoridades se comprueba GitHub y si van las propias.
+    Sirve para ver desde fuera que el .exe las lleva dentro de verdad."""
+    try:
+        n = len(contexto_ssl().get_ca_certs())
+    except Exception:
+        n = 0
+    try:
+        import certifi
+        propias = os.path.exists(certifi.where())
+    except Exception:
+        propias = False
+    return {"autoridades": n, "propias": propias}
+
+
+def motivo_red(e):
+    """Traduce el error técnico a algo que se entienda y diga qué hacer."""
+    t = str(e)
+    if "CERTIFICATE_VERIFY_FAILED" in t:
+        return ("este PC no consigue validar el certificado de GitHub. Le faltan "
+                "certificados raíz de Windows (pasa en los Windows Server) o el "
+                "antivirus inspecciona el tráfico. Instala la versión nueva a mano "
+                "una vez: desde la 2.5 el programa lleva los certificados dentro.")
+    if "getaddrinfo" in t or "11001" in t or "Name or service" in t:
+        return "este PC no tiene salida a internet (no resuelve github.com)"
+    if "timed out" in t or "timeout" in t.lower():
+        return "GitHub no contestó a tiempo"
+    if "403" in t and "rate" in t.lower():
+        return "GitHub pide esperar un rato antes de volver a preguntar"
+    return t
 
 
 def _num_version(v):
@@ -3977,7 +4039,7 @@ def buscar_actualizacion(c=None):
         "https://api.github.com/repos/%s/releases/latest" % repo,
         headers={"Accept": "application/vnd.github+json",
                  "User-Agent": "InventarioRFID/" + VERSION})
-    with urllib.request.urlopen(req, timeout=20) as r:
+    with urllib.request.urlopen(req, timeout=20, context=contexto_ssl()) as r:
         j = json.loads(r.read().decode("utf-8"))
     nueva = str(j.get("tag_name") or "")
     exe = None
@@ -4010,7 +4072,8 @@ def _descargar_exe(url, destino, tamano=0):
                                    or host.endswith(".githubusercontent.com")):
         raise OSError("la descarga no viene de GitHub: se cancela por seguridad")
     req = urllib.request.Request(url, headers={"User-Agent": "InventarioRFID/" + VERSION})
-    with urllib.request.urlopen(req, timeout=180) as r, open(destino, "wb") as f:
+    with urllib.request.urlopen(req, timeout=180, context=contexto_ssl()) as r, \
+            open(destino, "wb") as f:
         shutil.copyfileobj(r, f, 256 * 1024)
     n = os.path.getsize(destino)
     if tamano and n != tamano:
@@ -4118,7 +4181,7 @@ def revisar_si_toca():
             ESTADO_ACTUALIZACION.update(buscar_actualizacion())
         except Exception as e:
             ESTADO_ACTUALIZACION.update(
-                error=str(e)[:300],
+                error=motivo_red(e)[:300],
                 revisado=datetime.now().isoformat(timespec="seconds"))
         finally:
             _revisando = False
@@ -4142,7 +4205,7 @@ def bucle_actualizaciones():
                     instalar_actualizacion(info)
         except Exception as e:
             ESTADO_ACTUALIZACION.update(
-                error=str(e)[:300],
+                error=motivo_red(e)[:300],
                 revisado=datetime.now().isoformat(timespec="seconds"))
         time.sleep(max(1, int(MINUTOS_ENTRE_REVISIONES)) * 60)
 
@@ -4164,7 +4227,8 @@ def api_actualizacion():
     hace rato que no se mira, así el aviso aparece a los pocos segundos."""
     revisar_si_toca()
     return jsonify(dict(ESTADO_ACTUALIZACION, version=VERSION,
-                        instalable=bool(getattr(sys, "frozen", False))))
+                        instalable=bool(getattr(sys, "frozen", False)),
+                        certificados=resumen_certificados()))
 
 
 @app.post("/api/actualizacion/buscar")
@@ -4173,8 +4237,8 @@ def api_actualizacion_buscar():
     try:
         info = buscar_actualizacion()
     except Exception as e:
-        ESTADO_ACTUALIZACION.update(error=str(e)[:300])
-        return jsonify(ok=False, error="No se pudo consultar: %s" % e), 502
+        ESTADO_ACTUALIZACION.update(error=motivo_red(e)[:300])
+        return jsonify(ok=False, error="No se pudo consultar: %s" % motivo_red(e)), 502
     ESTADO_ACTUALIZACION.update(info)
     return jsonify(ok=True, **dict(info, instalable=bool(getattr(sys, "frozen", False))))
 
