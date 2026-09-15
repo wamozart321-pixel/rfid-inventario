@@ -968,12 +968,12 @@ function formProducto(p){
       <div class="fila2" style="align-items:start;margin-top:4px">
         <div>
           <div class="hint" style="margin:0 0 3px;text-align:center">🏷️ Código de barras (Zebra)</div>
-          <img id="f-prev-cb" alt="" style="width:100%;border:1px solid var(--borde);border-radius:6px;background:#fff;display:none">
+          <img id="f-prev-cb" alt="" style="width:100%;border:1px solid var(--borde);border-radius:6px;background:#fff/*papel*/;display:none">
           <div class="hint" id="f-prev-cb-msg" style="text-align:center">generando…</div>
         </div>
         <div>
           <div class="hint" style="margin:0 0 3px;text-align:center">📝 Descripción (SAT)</div>
-          <img id="f-prev-desc" alt="" style="width:100%;border:1px solid var(--borde);border-radius:6px;background:#fff;display:none">
+          <img id="f-prev-desc" alt="" style="width:100%;border:1px solid var(--borde);border-radius:6px;background:#fff/*papel*/;display:none">
           <div class="hint" id="f-prev-desc-msg" style="text-align:center">generando…</div>
         </div>
       </div>
@@ -1590,7 +1590,7 @@ function infoProducto(){
         corregirlas y guardar con el botón de abajo</span>` : ''}</div>
     ${MODO === 'vendedor'
       ? `<textarea id="i-refs-edit" style="width:100%;height:110px;box-sizing:border-box;
-              background:#FFFFFF;border:1px solid var(--borde-campo);border-radius:4px;padding:6px 8px;
+              background:var(--campo);border:1px solid var(--borde-campo);border-radius:4px;padding:6px 8px;
               font-size:11.5px;margin-top:-6px;resize:vertical"
               placeholder="cargando…"></textarea>`
       : `<div id="i-refs" style="max-height:110px;overflow:auto;white-space:pre-wrap;word-break:break-word;
@@ -2696,7 +2696,7 @@ async function explorarServidor(idCampo, modoArchivo, alElegir){
      <div id="ec-aviso" class="hint" style="min-height:16px"></div>
      <div style="display:flex;gap:8px">
        <div id="ec-lista" style="flex:1;height:290px;overflow:auto;border:1px solid var(--borde);
-            border-radius:3px;background:#fff"></div>
+            border-radius:3px;background:var(--campo)"></div>
        ${modoArchivo ? `<div id="ec-vista" style="width:190px;height:290px;border:1px solid var(--borde);
             border-radius:3px;background:var(--fila-par);display:flex;align-items:center;
             justify-content:center;padding:6px;text-align:center;color:var(--tenue);
@@ -3186,7 +3186,7 @@ function dibujarEtiqueta(desdeRender){
   const W = wd * esc, H = hd * esc;
   const rad = 3 / 25.4 * dpi * esc;                   // esquinas troqueladas ~3 mm
   lienzo.innerHTML = `<div id="dis-etq" style="position:relative;flex:none;margin:auto;
-    width:${W}px;height:${H}px;background:#fff;border-radius:${rad}px;
+    width:${W}px;height:${H}px;background:#fff/*papel*/;border-radius:${rad}px;
     box-shadow:0 6px 26px rgba(0,0,0,.35)">
     <div id="dis-cargando">actualizando…</div>
     <div id="dis-guia" style="position:absolute;left:50%;top:0;bottom:0;width:0;
@@ -3370,7 +3370,7 @@ function activarElemento(el, k, esc, wd, hd, ft){
       const L = gL = r.left - re.left, T = gT = r.top - re.top;
       parche = document.createElement('div');
       parche.style.cssText = `position:absolute;left:${L}px;top:${T}px;width:${r.width}px;
-        height:${r.height}px;background:#fff;z-index:2;pointer-events:none`;
+        height:${r.height}px;background:#fff/*papel*/;z-index:2;pointer-events:none`;
       ghost = document.createElement('div');
       ghost.style.cssText = `position:absolute;left:${L}px;top:${T}px;width:${r.width}px;
         height:${r.height}px;z-index:3;pointer-events:none;background-image:url(${bgUrl});
