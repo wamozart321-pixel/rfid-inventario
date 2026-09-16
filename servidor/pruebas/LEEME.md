@@ -32,6 +32,8 @@ con qué mensaje.
 | `test_certificados.py` | El certificado de GitHub SIEMPRE se comprueba; los errores se explican |
 | `test_modo_oscuro.py` | Contraste del modo oscuro y ningún fondo blanco fijo suelto |
 | `test_modos_cliente.py` | Un solo programa para PC principal, mostrador y vendedor |
+| `test_codigo_barras.py` | La fórmula del EAN-13, el dígito de control y encontrar el repuesto al escanear |
+| `test_importar_precios.py` | Qué columna es cada cosa al importar, y lo que NUNCA puede confundirse |
 
 ## Si escribes una prueba nueva
 
@@ -56,5 +58,5 @@ base buena.
 
 Antes vivían en una carpeta temporal de Windows y se borraron solas: de 70
 pruebas quedaron 11. Dentro del repositorio van con el código y no se pierden.
-Faltan por rehacer las que cubrían códigos de barras, precios, etiquetas e
-importaciones.
+Ya están rehechas las de **códigos de barras** y las de **importación y precios**.
+Faltan las del diseño y la impresión de etiquetas.
