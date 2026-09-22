@@ -108,8 +108,8 @@ assert A._revisando is False, "el candado se suelta aunque falle"
 ok("si falla la consulta se anota el motivo y no deja el sistema bloqueado")
 
 # --- la versión subió ---
-assert A.VERSION == "2.6"
-assert cl.get("/api/actualizacion").get_json()["version"] == "2.6"
-ok("la versión del programa es la 2.6")
+assert A.VERSION == "2.7"
+assert cl.get("/api/actualizacion").get_json()["version"] == "2.7"
+ok("la versión del programa es la 2.7")
 
 print("\nTODAS LAS PRUEBAS PASARON")

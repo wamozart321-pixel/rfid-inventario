@@ -6,7 +6,7 @@
 ; (para MUDAR el servidor a otro PC), que antes guarda copia de los actuales.
 
 #define MyAppName "Inventario RFID"
-#define MyAppVersion "2.6"
+#define MyAppVersion "2.7"
 #define MyAppExeName "ServidorInventarioRFID.exe"
 
 [Setup]

@@ -1968,7 +1968,12 @@ def api_dashboard():
             LEFT JOIN productos p ON p.id=t.producto_id
             WHERE l.sesion_id=? ORDER BY l.id DESC LIMIT 12""", (s["id"],)).fetchall()]
     revisar_si_toca()   # abrir la pantalla dispara la revisión
+    # cuántos repuestos tienen ya su etiqueta RFID: mientras falten, las
+    # cantidades no están verificadas con la pistola
+    etiquetados = d.execute("""SELECT COUNT(DISTINCT producto_id) c FROM tags
+                               WHERE producto_id IS NOT NULL""").fetchone()["c"]
     return jsonify(productos=tot, tags=tags, leidos=leidos,
+                   etiquetados=etiquetados,
                    sesion=(dict(s) if s else None), ultimas=ultimas,
                    respaldo=ULTIMO_RESPALDO,   # para avisar de la copia diaria
                    actualizacion=dict(ESTADO_ACTUALIZACION, version=VERSION))
@@ -3942,7 +3947,7 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "2.6"
+VERSION = "2.7"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
 PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida

@@ -319,6 +319,9 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
       <button class="btn" id="fl-limpiar" onclick="limpiarFiltros()" style="display:none">✖ Limpiar</button>
       <span class="hint" id="fl-cuenta" style="margin-left:auto"></span>
     </div>
+    <div id="aviso-inventario" style="display:none;margin:8px 12px 0;padding:9px 12px;
+         border-radius:6px;background:var(--aviso);border:1px solid var(--aviso-borde);
+         line-height:1.5"></div>
     <div class="twrap"><table id="t-productos">
       <thead><tr>
         <th data-c="sku" style="width:120px">Código</th>
@@ -1585,6 +1588,7 @@ function infoProducto(){
       ${fila('📍 Posición', `<span id="i-pos">cargando…</span>`)}
       ${fila('Etiquetas RFID', fmt(p.n_tags) + ' asociada(s)')}
     </table>
+    ${avisoCantidad(p)}
     <div style="font-size:12px;color:var(--texto2);font-weight:600">Referencias aplicables
       ${MODO === 'vendedor' ? `<span class="hint" style="font-weight:400">— puedes
         corregirlas y guardar con el botón de abajo</span>` : ''}</div>
@@ -1714,6 +1718,7 @@ async function fijarCantidad(){
   modal('Fijar stock — ' + esc(p.sku),
     `<div class="hint">${esc(p.nombre)}</div>
      <div style="font-size:12px;color:var(--texto2);font-weight:600;margin-top:6px">Existencias por bodega</div>
+     ${avisoCantidad(p)}
      <div id="f-bodegas">${bod.map(filaBodegaHtml).join('')}</div>
      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
        <button class="btn mini" type="button" onclick="agregarFilaBodega()">➕ Otra bodega</button>
@@ -3969,10 +3974,43 @@ function cambiarTema(){
 }
 pintarBotonTema();
 
+/* ---------------- inventario sin terminar ----------------
+   Las etiquetas RFID todavía no han llegado, así que la mayoría de repuestos
+   no se ha contado nunca con la pistola. Mientras eso siga así, las
+   cantidades que se ven vienen de lo que se importó y NO están verificadas:
+   hay que mirar Siigo antes de fiarse. */
+function sinVerificar(p){ return !(p && p.n_tags > 0); }
+
+function avisoCantidad(p){
+  if(!sinVerificar(p)) return '';
+  return `<div style="background:var(--aviso);border:1px solid var(--aviso-borde);
+       border-radius:6px;padding:9px 11px;line-height:1.5;font-size:12.5px">
+    ⚠️ <b>Cantidad sin verificar.</b> Este repuesto todavía <b>no tiene etiqueta RFID</b>,
+    así que nunca se ha contado con la pistola: lo que ves viene de lo que se importó.
+    <br><b>Revisa Siigo</b> antes de fiarte de esta cantidad o de prometerle una a un cliente.
+  </div>`;
+}
+
+/* El aviso de arriba de la lista: dice cuánto falta por etiquetar. */
+function pintarAvisoInventario(j){
+  const caja = document.getElementById('aviso-inventario');
+  if(!caja || !j || !j.productos) return;
+  const faltan = j.productos - (j.etiquetados || 0);
+  if(faltan <= 0){ caja.style.display = 'none'; return; }
+  const pct = Math.round(100 * faltan / j.productos);
+  caja.style.display = '';
+  caja.innerHTML = `⚠️ <b>Inventario sin terminar.</b> Faltan las etiquetas RFID de
+    <b>${fmt(faltan)}</b> de ${fmt(j.productos)} repuestos (${pct}%), así que
+    <b>sus cantidades no se han contado con la pistola</b>.
+    <span class="hint">Lo que se ve viene de lo que se importó. Para algo importante,
+    revisa Siigo primero.</span>`;
+}
+
 async function stats(){
   try{
     const j = await api('/api/dashboard');
     avisarRespaldo(j.respaldo);
+    pintarAvisoInventario(j);
     avisarActualizacion(j.actualizacion);
     document.getElementById('b-der').textContent =
       `${fmt(j.productos)} productos · ${fmt(j.tags)} etiquetas` +
