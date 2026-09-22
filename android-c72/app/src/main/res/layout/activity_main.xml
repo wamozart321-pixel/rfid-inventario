@@ -1,9 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:padding="12dp"
+    android:orientation="vertical"
     android:layout_width="match_parent" android:layout_height="match_parent"
     android:background="#14181D">
 
+    <!-- dos pestañas: leer con la pistola / ver el inventario como en el PC -->
+    <LinearLayout android:orientation="horizontal"
+        android:layout_width="match_parent" android:layout_height="46dp">
+        <Button android:id="@+id/tabLeer" android:text="📡 LEER"
+            android:textSize="15sp" android:backgroundTint="#F5A623" android:textColor="#14181D"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"/>
+        <Button android:id="@+id/tabInventario" android:text="📋 INVENTARIO"
+            android:textSize="15sp" android:backgroundTint="#37474F" android:textColor="#FFFFFF"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent"/>
+    </LinearLayout>
+
+    <!-- pantalla del inventario: la MISMA del PC, con zoom de dos dedos -->
+    <LinearLayout android:id="@+id/pantallaInventario" android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1">
+        <TextView android:id="@+id/webEstado" android:text="Conectando con el servidor…"
+            android:textColor="#8695A5" android:textSize="13sp" android:padding="8dp"
+            android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <WebView android:id="@+id/webInventario"
+            android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="1"/>
+    </LinearLayout>
+
+    <!-- pantalla de siempre: leer con la pistola -->
+    <LinearLayout android:id="@+id/pantallaLeer"
+        android:orientation="vertical" android:padding="12dp"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1">
     <TextView android:id="@+id/estado" android:text="Iniciando lector…"
         android:textColor="#8695A5" android:textSize="14sp"
         android:layout_width="match_parent" android:layout_height="wrap_content"/>
@@ -68,4 +97,5 @@
     <ListView android:id="@+id/lista"
         android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:layout_marginTop="2dp"/>
+    </LinearLayout>
 </LinearLayout>

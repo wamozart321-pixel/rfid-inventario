@@ -149,6 +149,66 @@ class MainActivity : AppCompatActivity() {
     private val urlServidor get() = prefs.getString("url", "http://192.168.1.10:5000")!!
     private val nombreEquipo get() = prefs.getString("nombre", "C72-01")!!
 
+    // ---- pantalla del INVENTARIO (la misma que se ve en el PC) ----
+    private var web: android.webkit.WebView? = null
+    private var enInventario = false
+
+    /** Deja el inventario listo la primera vez que se entra, no al arrancar:
+     *  así la app abre igual de rápido para quien solo viene a leer. */
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    private fun prepararWeb() {
+        if (web != null) return
+        val w = findViewById<android.webkit.WebView>(R.id.webInventario)
+        val est = findViewById<TextView>(R.id.webEstado)
+        w.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true          // el modo oscuro se recuerda aquí
+            // que se vea COMO EN EL PC y se pueda acercar con dos dedos
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            setSupportZoom(true)
+            builtInZoomControls = true
+            displayZoomControls = false
+        }
+        w.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageFinished(v: android.webkit.WebView?, url: String?) {
+                est.visibility = android.view.View.GONE
+            }
+            override fun onReceivedError(v: android.webkit.WebView?,
+                                         req: android.webkit.WebResourceRequest?,
+                                         err: android.webkit.WebResourceError?) {
+                est.visibility = android.view.View.VISIBLE
+                est.text = "No se pudo abrir el inventario en $urlServidor\n" +
+                           "Revisa que el PC servidor esté prendido y en la misma red (⚙)."
+            }
+        }
+        web = w
+    }
+
+    private fun mostrarInventario(si: Boolean) {
+        enInventario = si
+        findViewById<android.view.View>(R.id.pantallaInventario).visibility =
+            if (si) android.view.View.VISIBLE else android.view.View.GONE
+        findViewById<android.view.View>(R.id.pantallaLeer).visibility =
+            if (si) android.view.View.GONE else android.view.View.VISIBLE
+        findViewById<Button>(R.id.tabLeer).backgroundTintList =
+            android.content.res.ColorStateList.valueOf(
+                android.graphics.Color.parseColor(if (si) "#37474F" else "#F5A623"))
+        findViewById<Button>(R.id.tabLeer).setTextColor(
+            android.graphics.Color.parseColor(if (si) "#FFFFFF" else "#14181D"))
+        findViewById<Button>(R.id.tabInventario).backgroundTintList =
+            android.content.res.ColorStateList.valueOf(
+                android.graphics.Color.parseColor(if (si) "#F5A623" else "#37474F"))
+        findViewById<Button>(R.id.tabInventario).setTextColor(
+            android.graphics.Color.parseColor(if (si) "#14181D" else "#FFFFFF"))
+        if (si) {
+            if (leyendo) detener()      // no se lee a ciegas mientras se consulta
+            prepararWeb()
+            val destino = "$urlServidor/escritorio"
+            if (web?.url == null) web?.loadUrl(destino)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -161,6 +221,8 @@ class MainActivity : AppCompatActivity() {
         lista.adapter = adaptador
 
         btnLeer.setOnClickListener { if (leyendo) detener() else iniciar() }
+        findViewById<Button>(R.id.tabLeer).setOnClickListener { mostrarInventario(false) }
+        findViewById<Button>(R.id.tabInventario).setOnClickListener { mostrarInventario(true) }
         lista.setOnItemClickListener { _, _, pos, _ ->
             val sku = skusMostrados.getOrNull(pos) ?: return@setOnItemClickListener
             detalleRepuesto(sku)
@@ -508,6 +570,15 @@ class MainActivity : AppCompatActivity() {
     //  - gatillo empuñadura -> RFID (códigos de gatillo del demo Chainway)
     private val teclasEscaner = setOf(139, 142, 249, 250, 251, 252)
     private val teclasGatillo = setOf(280, 291, 293, 294, 311, 312, 313, 315, 591, 593, 594, 595, 596)
+
+    @Deprecated("El gatillo necesita el comportamiento clásico del botón atrás")
+    override fun onBackPressed() {
+        val w = web
+        if (enInventario && w != null && w.canGoBack()) { w.goBack(); return }
+        if (enInventario) { mostrarInventario(false); return }
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
+    }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode in teclasEscaner) {
