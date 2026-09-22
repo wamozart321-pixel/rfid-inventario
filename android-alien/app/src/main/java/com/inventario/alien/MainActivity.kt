@@ -120,7 +120,8 @@ class MainActivity : Activity(), RFIDCallback {
         w.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true          // el modo oscuro se recuerda aquí
-            // que se vea COMO EN EL PC y se pueda acercar con dos dedos
+            // La pantalla se adapta sola: en una tableta se ve como en el PC y
+            // en un celular se acomoda. El zoom de dos dedos queda igual.
             useWideViewPort = true
             loadWithOverviewMode = true
             setSupportZoom(true)
