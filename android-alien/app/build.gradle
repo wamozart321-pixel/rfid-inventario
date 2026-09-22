@@ -1,0 +1,22 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+android {
+    namespace 'com.inventario.alien'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.inventario.alien"
+        minSdk 19               // Alien ALR-H450 = Android 4.4 (API 19)
+        targetSdk 22            // <23: permisos al instalar (sin diálogos en 4.4)
+        versionCode 1
+        versionName "1.0"
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    kotlinOptions { jvmTarget = '17' }
+}
+dependencies {
+    // aliensdk.jar (extraído de la demo de Alien: com.alien.rfid.* + com.rscja.*)
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+}
