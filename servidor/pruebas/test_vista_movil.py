@@ -22,7 +22,18 @@ A.CFG = os.path.join(TMP, "c.json")
 A.BASE = TMP
 A.init_db()
 ok = lambda m: print("[OK] " + m)
-h = A.app.test_client().get("/escritorio").get_data(as_text=True)
+
+# --- ANTES QUE NADA: la página tiene que cargar ---
+# En la plantilla, «{#» abre un comentario. Si en el CSS aparece «{#algo»
+# (una regla pegada a un selector de id), la página entera da error 500 y
+# el inventario se cae en TODOS los equipos. Ya pasó una vez.
+fuente = open(ruta("templates", "escritorio.html"), encoding="utf-8").read()
+assert "{#" not in fuente, ("hay un «{#» en la plantilla: se lee como comentario "
+                            "y la página se cae. Pon un espacio: «{ #»")
+r = A.app.test_client().get("/escritorio")
+assert r.status_code == 200, "la pantalla no carga: HTTP %d" % r.status_code
+ok("la pantalla carga (200) y no hay ningún «{#» suelto que la tumbe")
+h = r.get_data(as_text=True)
 
 # --- el teléfono la dibuja a SU ancho ---
 cab = h.split("</head>")[0]
@@ -43,8 +54,11 @@ assert "#t-resumen th:nth-child(3)" in movil, "el conteo también debe compactar
 ok("en el celular se ocultan bodega y precio mínimo; quedan código, nombre, precio y stock")
 
 # nunca se ocultan las dos primeras: sin código ni nombre no sirve de nada
-assert "nth-child(1)" not in h and "nth-child(2)" not in h, \
-    "jamás ocultar el código ni el nombre del repuesto"
+# (se busca en cada regla que OCULTA algo; darles ancho sí está permitido)
+for selectores in re.findall(r"([^{}]+)\{[^{}]*display:none[^{}]*\}", h):
+    for col in ("nth-child(1)", "nth-child(2)"):
+        assert not ("t-productos" in selectores and col in selectores), \
+            "jamás ocultar el código ni el nombre del repuesto: " + selectores.strip()[:90]
 ok("el código y el nombre no se ocultan nunca")
 
 # --- los formularios de dos columnas pasan a una ---

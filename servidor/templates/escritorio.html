@@ -50,6 +50,12 @@ html[data-tema="oscuro"] #dis-etq *{filter:none}
 #btn-tema{display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:15px;
           border-left:1px solid var(--borde);user-select:none}
 #btn-tema:hover{background:var(--caja)}
+#btn-escala{display:none;align-items:center;padding:0 11px;cursor:pointer;font-size:14px;
+            font-weight:700;border-left:1px solid var(--borde);user-select:none}
+#btn-escala:hover{background:var(--caja)}
+/* celulares y tabletas. OJO: el espacio tras la llave NO se puede quitar:
+   pegados, «{» y «#» abren un comentario de la plantilla y la página se cae */
+@media (pointer:coarse){ #btn-escala{display:flex} }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font:13px 'Segoe UI',Tahoma,sans-serif;color:var(--texto);background:var(--fondo);
@@ -200,14 +206,41 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
   #b-der{display:none}                          /* la dirección de la pistola */
 }
 @media (max-width:620px){
+  /* FILTROS plegados: solo el título (que hace de botón) y la cuenta.
+     Con «!important» porque cada filtro trae su «display» escrito en línea. */
+  #barra-filtros:not(.abierto) > :not(#fl-titulo):not(#fl-cuenta){display:none!important}
+  #fl-titulo{cursor:pointer;padding:4px 2px}
+  #fl-titulo::after{content:' ▾'}
+  #barra-filtros.abierto #fl-titulo::after{content:' ▴'}
+  /* el aviso: la letra pequeña se queda para el PC */
+  #aviso-inventario{margin:6px 8px 0!important;padding:7px 10px!important;font-size:12.5px}
+  #aviso-inventario .hint{display:none}
+  /* la TABLA reparte el ancho que haya, así nunca se corta por la derecha */
+  #t-productos,#t-resumen{table-layout:fixed}
+  #t-productos th,#t-resumen th{width:auto!important}
+  /* las columnas que se ven suman 99 % (el 1 % que falta cubre los bordes): las ocultas siguen existiendo y,
+     si sobrara algo, se lo repartirían con el nombre y lo dejarían en «A…» */
+  #t-productos th:nth-child(1){width:30%!important}
+  #t-productos th:nth-child(2){width:27%!important}
+  #t-productos th:nth-child(6){width:27%!important}
+  #t-productos th:nth-child(7){width:15%!important}
+  #t-resumen th:nth-child(1){width:30%!important}
+  #t-resumen th:nth-child(2){width:30%!important}
+  #t-resumen th:nth-child(5){width:18%!important}
+  #t-resumen th:nth-child(6){width:21%!important}
   /* en un celular solo caben: código, nombre, precio y stock */
   #t-productos th:nth-child(4),#t-productos td:nth-child(4),
   #t-productos th:nth-child(5),#t-productos td:nth-child(5){display:none}
   /* y en el conteo: código, nombre, contado y diferencia */
   #t-resumen th:nth-child(3),#t-resumen td:nth-child(3),
   #t-resumen th:nth-child(4),#t-resumen td:nth-child(4){display:none}
-  .tab{padding:0 10px;font-size:12.5px}
-  #marca{padding:0 10px;font-size:11.5px}
+  /* la tira de arriba tiene que caber hasta en 260 px (celular de 390 al 150 %):
+     el logo se queda en «☰» y las pestañas encogen con «…» antes que salirse */
+  .tab{padding:0 9px;font-size:12.5px;display:block;line-height:34px;
+       flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #marca{padding:0 12px;font-size:0}
+  #marca::before{content:'☰';font-size:17px}
+  #btn-escala,#btn-tema{flex:none}
   .bg{min-width:46px;max-width:62px;font-size:10px;gap:2px}
   .bg .ic{font-size:17px}
   #buscar{width:100%;margin:4px 0}
@@ -242,6 +275,36 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
              ? 'oscuro' : 'claro';
   document.documentElement.setAttribute('data-tema', t);
 })();
+
+/* TAMAÑO DE LA PANTALLA (celulares y tabletas).
+   No es un zoom: se le dice al teléfono que haga como si su pantalla fuera
+   más ancha o más estrecha. Así todo se reacomoda sin arrastrar de lado, y
+   al achicar vuelven a caber columnas. 1 = el tamaño de siempre. */
+function anchoPantalla(){
+  var w = screen.width || 390, h = screen.height || 844;
+  var horiz = window.matchMedia && matchMedia('(orientation: landscape)').matches;
+  return horiz ? Math.max(w, h) : Math.min(w, h);
+}
+function ponerEscala(z){
+  var m = document.querySelector('meta[name=viewport]');
+  if(!m) return;
+  if(!z || z === 1){
+    m.setAttribute('content', 'width=device-width,initial-scale=1');
+  }else{
+    m.setAttribute('content', 'width=' + Math.round(anchoPantalla() / z) +
+                              ',initial-scale=' + z);
+  }
+}
+var ESCALA = 1;
+try{ ESCALA = parseFloat(localStorage.getItem('escala')) || 1; }catch(e){}
+if(ESCALA !== 1) ponerEscala(ESCALA);
+/* al girar el teléfono cambia el ancho: se recalcula */
+if(window.matchMedia){
+  var girado = matchMedia('(orientation: landscape)');
+  var alGirar = function(){ if(ESCALA !== 1) ponerEscala(ESCALA); };
+  if(girado.addEventListener) girado.addEventListener('change', alGirar);
+  else if(girado.addListener) girado.addListener(alGirar);
+}
 </script>
 </head>
 <body>
@@ -252,6 +315,7 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
   <div class="tab activa" data-tab="productos">Productos</div>
   {% if modo != 'vendedor' %}<div class="tab" data-tab="inventario">Inventario</div>{% endif %}
   <div id="tira-info">{% if modo == 'vendedor' %}👁 SOLO CONSULTA (VENDEDORES) &nbsp;·&nbsp; {% elif modo == 'principal' %}🖥 PC PRINCIPAL &nbsp;·&nbsp; {% endif %}REPUESTOSVOLKSWAGENCOM SAS</div>
+  <div id="btn-escala" onclick="ajustarEscala()" title="Tamaño de la pantalla">Aa</div>
   <div id="btn-tema" onclick="cambiarTema()" title="Cambiar entre claro y oscuro">🌙</div>
 </div>
 
@@ -345,7 +409,8 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
 
   <div class="vista" id="v-productos">
     <div class="cab" id="barra-filtros" style="font-size:12px;gap:8px">
-      <span style="font-weight:600;color:var(--texto2)">🔎 Filtros:</span>
+      <span id="fl-titulo" onclick="plegarFiltros()"
+            style="font-weight:600;color:var(--texto2)">🔎 Filtros:</span>
       <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Proveedor
         <select id="fl-prov" onchange="aplicarFiltros()" style="max-width:150px"><option value="">todos</option></select></label>
       <label style="display:flex;align-items:center;gap:4px;color:var(--texto2)">Bodega
@@ -4023,6 +4088,54 @@ function cambiarTema(){
 }
 pintarBotonTema();
 
+/* En el celular los filtros van plegados: solo se ve «🔎 Filtros ▾» y la
+   cuenta. Al tocar se despliegan. En el PC esto no cambia nada. */
+function plegarFiltros(){
+  document.getElementById('barra-filtros').classList.toggle('abierto');
+}
+
+/* Ventanita para ajustar el tamaño. Cada toque se aplica al momento, así se
+   ve el resultado antes de cerrar. Se guarda en ESTE equipo. */
+const ESCALAS = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
+function cambiarEscala(z){
+  ESCALA = z;
+  try{
+    if(z === 1) localStorage.removeItem('escala');
+    else localStorage.setItem('escala', String(z));
+  }catch(e){}
+  ponerEscala(z);
+}
+function ajustarEscala(){
+  const pinta = ov => {
+    ov.querySelector('#esc-valor').textContent = Math.round(ESCALA * 100) + ' %';
+    ov.querySelector('#esc-menos').disabled = ESCALA <= ESCALAS[0];
+    ov.querySelector('#esc-mas').disabled = ESCALA >= ESCALAS[ESCALAS.length - 1];
+  };
+  const paso = (ov, d) => {
+    let i = ESCALAS.indexOf(ESCALA);
+    if(i < 0) i = ESCALAS.indexOf(1);
+    i = Math.max(0, Math.min(ESCALAS.length - 1, i + d));
+    cambiarEscala(ESCALAS[i]);
+    pinta(ov);
+  };
+  const ov = modal('Tamaño de la pantalla', `
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0">
+      <button class="btn" id="esc-menos" style="font-size:15px;min-width:64px">A−</button>
+      <b id="esc-valor" style="font-size:20px;min-width:74px;text-align:center"></b>
+      <button class="btn" id="esc-mas" style="font-size:19px;min-width:64px">A+</button>
+    </div>
+    <div class="hint" style="text-align:center;line-height:1.5">
+      <b>Más pequeño</b>: caben más cosas; si achicas bastante, vuelven columnas que en el celular se ocultan.<br>
+      <b>Más grande</b>: se lee y se toca mejor.<br>
+      Se guarda en este equipo. 100 % es el tamaño de siempre.
+    </div>`,
+    [{t:'Volver al 100 %', f:o => { cambiarEscala(1); pinta(o); }},
+     {t:'Listo', p:1}]);
+  ov.querySelector('#esc-menos').onclick = () => paso(ov, -1);
+  ov.querySelector('#esc-mas').onclick = () => paso(ov, +1);
+  pinta(ov);
+}
+
 /* ---------------- inventario sin terminar ----------------
    Las etiquetas RFID todavía no han llegado, así que la mayoría de repuestos
    no se ha contado nunca con la pistola. Mientras eso siga así, las
@@ -4046,13 +4159,13 @@ function pintarAvisoInventario(j){
   if(!caja || !j || !j.productos) return;
   const faltan = j.productos - (j.etiquetados || 0);
   if(faltan <= 0){ caja.style.display = 'none'; return; }
-  const pct = Math.round(100 * faltan / j.productos);
+  // hacia abajo: con 26 etiquetados no puede decir «100 %»
+  const pct = Math.floor(100 * faltan / j.productos);
   caja.style.display = '';
   caja.innerHTML = `⚠️ <b>Inventario sin terminar.</b> Faltan las etiquetas RFID de
-    <b>${fmt(faltan)}</b> de ${fmt(j.productos)} repuestos (${pct}%), así que
-    <b>sus cantidades no se han contado con la pistola</b>.
-    <span class="hint">Lo que se ve viene de lo que se importó. Para algo importante,
-    revisa Siigo primero.</span>`;
+    <b>${fmt(faltan)}</b> de ${fmt(j.productos)} repuestos (${pct}%): sus cantidades
+    <b>no se han contado con la pistola</b>. <b>Revisa Siigo</b> antes de fiarte.
+    <span class="hint">Lo que se ve viene de lo que se importó.</span>`;
 }
 
 async function stats(){

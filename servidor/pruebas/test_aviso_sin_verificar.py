@@ -88,7 +88,11 @@ ok("el aviso general va arriba de la lista de productos")
 
 # ===================================================== cuándo se calla
 # Solo cuando esté TODO etiquetado: si no, seguiría engañando.
-fn = h.split("function pintarAvisoInventario")[1][:700]
+fn = h.split("function pintarAvisoInventario")[1][:900]
+# el porcentaje se redondea hacia ABAJO: con 26 etiquetados de 8.374 debe
+# decir 99 %, no «100 %» (pasó: parecía que no había ninguno)
+assert "Math.floor(100 * faltan" in fn, "el porcentaje debe redondear hacia abajo"
+ok("el porcentaje redondea hacia abajo: nunca dice 100 % si hay alguno etiquetado")
 assert "j.productos - (j.etiquetados || 0)" in fn
 assert "faltan <= 0" in fn and "display = 'none'" in fn
 ok("el aviso solo desaparece cuando ya no falta ningún repuesto por etiquetar")

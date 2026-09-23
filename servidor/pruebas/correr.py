@@ -23,12 +23,17 @@ def main():
         return 1
 
     entorno = dict(os.environ, PYTHONIOENCODING="utf-8")
-    bien, mal = [], []
+    bien, mal, saltadas = [], [], []
     for n in archivos:
         r = subprocess.run([sys.executable, os.path.join(PRUEBAS, n)],
                            capture_output=True, text=True, encoding="utf-8",
                            errors="replace", env=entorno)
-        if r.returncode == 0:
+        if r.returncode == 0 and "saltada" in (r.stdout or ""):
+            # pasó sin comprobar nada (falta un navegador, por ejemplo): se
+            # dice claro, para no tomar por buena una prueba que no se hizo
+            saltadas.append(n)
+            print("  SALTA %s" % n)
+        elif r.returncode == 0:
             bien.append(n)
             print("  OK    %s" % n)
         else:
@@ -38,6 +43,8 @@ def main():
             print("  FALLA %s" % n)
 
     print("\n%d de %d pruebas pasan" % (len(bien), len(archivos)))
+    if saltadas:
+        print("%d se saltaron sin comprobar nada: %s" % (len(saltadas), ", ".join(saltadas)))
     if mal:
         print("\nFallan:")
         for n, motivo in mal:

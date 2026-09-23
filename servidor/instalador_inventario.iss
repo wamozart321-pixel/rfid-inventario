@@ -5,7 +5,7 @@
 ;   -> Instalar-InventarioRFID-PCs.exe
 
 #define MyAppName "Inventario RFID"
-#define MyAppVersion "2.8"
+#define MyAppVersion "2.9"
 #define MyAppExeName "InventarioRFID-Cliente.exe"
 
 [Setup]
