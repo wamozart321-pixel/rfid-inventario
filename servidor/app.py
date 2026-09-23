@@ -110,6 +110,291 @@ def close_db(e=None):
     d = g.pop("db", None)
     if d: d.close()
 
+# ---------------------------------------------------------------- acceso desde afuera
+# Dentro de la bodega (la red del negocio) todo entra como siempre, sin clave.
+# Desde AFUERA se entra por una puerta aparte: el puerto 5001, que solo escucha
+# en este mismo PC. Ahí lo conecta Tailscale Funnel (o un túnel parecido), así
+# que TODO lo que llega por el 5001 viene de internet y pide usuario y
+# contraseña. No se fía de cabeceras que alguien de afuera podría inventarse.
+# Por si alguien abriera el 5000 en el router, una IP pública también cuenta
+# como de afuera.
+PUERTO_AFUERA = 5001
+COOKIE_AFUERA = "rfid_afuera"
+DIAS_SESION_AFUERA = 30
+FALLOS_POR_EQUIPO = 5        # intentos malos seguidos antes de bloquear
+FALLOS_EN_TOTAL = 30         # entre todos: frena a quien pruebe desde muchas IP
+MINUTOS_BLOQUEO = 15
+_fallos = {}                 # quién -> [momentos de los intentos malos]
+_fallos_candado = threading.Lock()
+# para que un usuario que NO existe tarde lo mismo que una clave mala
+_HASH_DE_RELLENO = None
+
+
+def es_de_afuera():
+    if request.environ.get("rfid.afuera"):
+        return True
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address((request.remote_addr or "").split("%")[0])
+    except ValueError:
+        return True
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return not (ip.is_private or ip.is_loopback)
+
+
+def ip_de_afuera():
+    """La IP de quien entra. Por el 5001 la pone el túnel (el único que puede
+    conectarse ahí) al FINAL de X-Forwarded-For; lo de antes lo escribe el
+    cliente y no vale."""
+    if request.environ.get("rfid.afuera"):
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff.strip():
+            return xff.split(",")[-1].strip()
+    return request.remote_addr or "?"
+
+
+def _huella(token):
+    import hashlib
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def usuario_de_sesion():
+    token = request.cookies.get(COOKIE_AFUERA, "")
+    if not token:
+        return None
+    d = db()
+    r = d.execute("""SELECT s.usuario, s.creada, s.ultima FROM sesiones_afuera s
+                     JOIN usuarios_afuera u ON u.usuario = s.usuario
+                     WHERE s.huella = ?""", (_huella(token),)).fetchone()
+    if not r:
+        return None
+    ahora = datetime.now()
+    try:
+        if ahora - datetime.fromisoformat(r["creada"]) > timedelta(days=DIAS_SESION_AFUERA):
+            d.execute("DELETE FROM sesiones_afuera WHERE huella=?", (_huella(token),))
+            d.commit()
+            return None
+        if ahora - datetime.fromisoformat(r["ultima"] or r["creada"]) > timedelta(minutes=5):
+            d.execute("UPDATE sesiones_afuera SET ultima=? WHERE huella=?",
+                      (ahora.isoformat(timespec="seconds"), _huella(token)))
+            d.commit()
+    except ValueError:
+        return None
+    return r["usuario"]
+
+
+def _limpiar_fallos(ahora):
+    for k in list(_fallos):
+        _fallos[k] = [t for t in _fallos[k] if ahora - t < MINUTOS_BLOQUEO * 60]
+        if not _fallos[k]:
+            del _fallos[k]
+
+
+def entrada_bloqueada(quien):
+    with _fallos_candado:
+        _limpiar_fallos(time.time())
+        return (len(_fallos.get(quien, [])) >= FALLOS_POR_EQUIPO
+                or len(_fallos.get("*", [])) >= FALLOS_EN_TOTAL)
+
+
+def anotar_fallo(quien):
+    with _fallos_candado:
+        ahora = time.time()
+        _fallos.setdefault(quien, []).append(ahora)
+        _fallos.setdefault("*", []).append(ahora)
+
+
+@app.before_request
+def portero():
+    """Desde afuera, sin sesión, solo se ve la página de entrar."""
+    if not es_de_afuera():
+        return None
+    g.afuera = True
+    p = request.path
+    if p in ("/entrar", "/salir", "/favicon.ico") or p.startswith("/static/"):
+        return None
+    u = usuario_de_sesion()
+    if u:
+        g.usuario_afuera = u
+        return None
+    if p.startswith("/api/") or request.method != "GET":
+        return jsonify(ok=False, entrar=True,
+                       error="Hay que iniciar sesión otra vez"), 401
+    from urllib.parse import quote
+    return redirect("/entrar?sig=" + quote(request.full_path.rstrip("?"), safe="/?=&"))
+
+
+def _destino_seguro(sig):
+    # solo rutas de ESTE servidor: nada de mandar a otra página tras entrar
+    if not sig or not sig.startswith("/") or sig.startswith("//") or "\\" in sig:
+        return "/escritorio"
+    return sig
+
+
+@app.route("/entrar", methods=["GET", "POST"])
+def entrar():
+    global _HASH_DE_RELLENO
+    from werkzeug.security import check_password_hash, generate_password_hash
+    sig = _destino_seguro(request.values.get("sig", ""))
+    if not es_de_afuera():
+        return redirect(sig)          # en la bodega no se pide nada
+    d = db()
+    hay = d.execute("SELECT COUNT(*) FROM usuarios_afuera").fetchone()[0] > 0
+    error, usuario = "", ""
+    if request.method == "POST" and hay:
+        quien = ip_de_afuera()
+        usuario = (request.form.get("usuario") or "").strip()[:40]
+        clave = request.form.get("clave") or ""
+        if entrada_bloqueada(quien):
+            error = ("Demasiados intentos fallidos. Espera %d minutos y vuelve a probar."
+                     % MINUTOS_BLOQUEO)
+        else:
+            r = d.execute("SELECT usuario, clave FROM usuarios_afuera WHERE usuario=?",
+                          (usuario,)).fetchone()
+            if _HASH_DE_RELLENO is None:
+                _HASH_DE_RELLENO = generate_password_hash(secrets.token_hex(8))
+            bien = check_password_hash(r["clave"] if r else _HASH_DE_RELLENO, clave)
+            if r and bien:
+                token = secrets.token_urlsafe(32)
+                ahora = datetime.now().isoformat(timespec="seconds")
+                d.execute("INSERT INTO sesiones_afuera(huella,usuario,creada,ultima,equipo) "
+                          "VALUES(?,?,?,?,?)",
+                          (_huella(token), r["usuario"], ahora, ahora,
+                           (request.headers.get("User-Agent") or "")[:160]))
+                d.execute("UPDATE usuarios_afuera SET ultimo=? WHERE usuario=?",
+                          (ahora, r["usuario"]))
+                d.commit()
+                with _fallos_candado:
+                    _fallos.pop(quien, None)
+                resp = redirect(sig)
+                resp.set_cookie(COOKIE_AFUERA, token, max_age=DIAS_SESION_AFUERA * 86400,
+                                httponly=True, samesite="Lax", path="/",
+                                secure=request.is_secure or
+                                request.headers.get("X-Forwarded-Proto", "") == "https")
+                return resp
+            anotar_fallo(quien)
+            error = "Usuario o contraseña incorrectos."
+    return render_template("entrar.html", hay=hay, error=error, usuario=usuario,
+                           sig=sig, c=cfg()), (429 if "Demasiados" in error else 200)
+
+
+@app.route("/salir", methods=["GET", "POST"])
+def salir():
+    token = request.cookies.get(COOKIE_AFUERA, "")
+    if token:
+        d = db()
+        d.execute("DELETE FROM sesiones_afuera WHERE huella=?", (_huella(token),))
+        d.commit()
+    resp = redirect("/entrar")
+    resp.delete_cookie(COOKIE_AFUERA, path="/")
+    return resp
+
+
+def _solo_en_la_bodega():
+    """Los usuarios de afuera se manejan SOLO desde un equipo de la bodega:
+    con una contraseña robada no se pueden crear más."""
+    if es_de_afuera():
+        return jsonify(ok=False, error="Los usuarios de afuera solo se manejan "
+                                       "desde un equipo de la bodega"), 403
+    return None
+
+
+@app.get("/api/afuera")
+def api_afuera():
+    no = _solo_en_la_bodega()
+    if no: return no
+    filas = db().execute("""SELECT u.usuario, u.nombre, u.creado, u.ultimo,
+                              (SELECT COUNT(*) FROM sesiones_afuera s
+                                WHERE s.usuario = u.usuario) AS equipos
+                            FROM usuarios_afuera u ORDER BY u.usuario""").fetchall()
+    return jsonify(ok=True, usuarios=[dict(r) for r in filas], puerto=PUERTO_AFUERA,
+                   escuchando=_puerta_afuera_abierta)
+
+
+@app.post("/api/afuera/guardar")
+def api_afuera_guardar():
+    no = _solo_en_la_bodega()
+    if no: return no
+    from werkzeug.security import generate_password_hash
+    f = request.get_json(silent=True) or {}
+    usuario = str(f.get("usuario") or "").strip()
+    clave = str(f.get("clave") or "")
+    nombre = str(f.get("nombre") or "").strip()[:60]
+    if not re.fullmatch(r"[A-Za-z0-9._-]{3,30}", usuario):
+        return jsonify(ok=False, error="El usuario: de 3 a 30 letras o números, "
+                                       "sin espacios ni tildes"), 400
+    d = db()
+    existe = d.execute("SELECT 1 FROM usuarios_afuera WHERE usuario=?", (usuario,)).fetchone()
+    if clave or not existe:
+        if len(clave) < 8:
+            return jsonify(ok=False, error="La contraseña debe tener al menos 8 caracteres"), 400
+        if clave.lower() == usuario.lower():
+            return jsonify(ok=False, error="La contraseña no puede ser igual al usuario"), 400
+    ahora = datetime.now().isoformat(timespec="seconds")
+    if existe:
+        d.execute("UPDATE usuarios_afuera SET nombre=? WHERE usuario=?", (nombre, usuario))
+        if clave:
+            # clave nueva: los equipos que entraron con la vieja tienen que volver a entrar
+            d.execute("UPDATE usuarios_afuera SET clave=? WHERE usuario=?",
+                      (generate_password_hash(clave), usuario))
+            d.execute("DELETE FROM sesiones_afuera WHERE usuario=?", (usuario,))
+        msg = "✔ Usuario %s actualizado" % usuario
+    else:
+        d.execute("INSERT INTO usuarios_afuera(usuario,clave,nombre,creado) VALUES(?,?,?,?)",
+                  (usuario, generate_password_hash(clave), nombre, ahora))
+        msg = "✔ Usuario %s creado" % usuario
+    d.commit()
+    return jsonify(ok=True, msg=msg)
+
+
+@app.post("/api/afuera/borrar")
+def api_afuera_borrar():
+    no = _solo_en_la_bodega()
+    if no: return no
+    usuario = str((request.get_json(silent=True) or {}).get("usuario") or "")
+    d = db()
+    d.execute("DELETE FROM sesiones_afuera WHERE usuario=?", (usuario,))
+    n = d.execute("DELETE FROM usuarios_afuera WHERE usuario=?", (usuario,)).rowcount
+    d.commit()
+    return jsonify(ok=bool(n), msg="✔ Usuario borrado: ya no puede entrar" if n
+                   else "Ese usuario no existe")
+
+
+@app.post("/api/afuera/cerrar")
+def api_afuera_cerrar():
+    """Echa a todos los equipos de un usuario (p. ej. se le perdió el celular)."""
+    no = _solo_en_la_bodega()
+    if no: return no
+    usuario = str((request.get_json(silent=True) or {}).get("usuario") or "")
+    d = db()
+    n = d.execute("DELETE FROM sesiones_afuera WHERE usuario=?", (usuario,)).rowcount
+    d.commit()
+    return jsonify(ok=True, msg="✔ Sesiones cerradas en %d equipo(s)" % n)
+
+
+def _app_afuera(environ, start_response):
+    environ["rfid.afuera"] = True   # todo lo que entra por aquí viene de internet
+    return app(environ, start_response)
+
+
+_puerta_afuera_abierta = False
+
+
+def iniciar_puerta_afuera():
+    """La puerta de afuera: el puerto 5001, SOLO en este PC (127.0.0.1)."""
+    global _puerta_afuera_abierta
+    if _puerta_afuera_abierta:
+        return
+    from werkzeug.serving import make_server
+    try:
+        srv = make_server("127.0.0.1", PUERTO_AFUERA, _app_afuera, threaded=True)
+    except OSError as e:
+        print("  No se pudo abrir la puerta de afuera (puerto %d): %s" % (PUERTO_AFUERA, e))
+        return
+    _puerta_afuera_abierta = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
 def init_db():
     con = sqlite3.connect(DB)
     con.executescript("""
@@ -178,6 +463,22 @@ def init_db():
         posicion TEXT DEFAULT '',
         epc_baliza TEXT DEFAULT '',
         ts TEXT);
+    -- Quién puede entrar DESDE AFUERA de la bodega (por internet). Dentro de
+    -- la red no se pide nada. La contraseña se guarda cifrada, nunca tal cual.
+    CREATE TABLE IF NOT EXISTS usuarios_afuera(
+        usuario TEXT PRIMARY KEY COLLATE NOCASE,
+        clave TEXT NOT NULL,
+        nombre TEXT DEFAULT '',
+        creado TEXT,
+        ultimo TEXT);
+    -- Cada equipo que entró desde afuera. Del token solo se guarda su huella:
+    -- ni leyendo la base se puede suplantar a nadie.
+    CREATE TABLE IF NOT EXISTS sesiones_afuera(
+        huella TEXT PRIMARY KEY,
+        usuario TEXT NOT NULL COLLATE NOCASE,
+        creada TEXT,
+        ultima TEXT,
+        equipo TEXT DEFAULT '');
     """)
     try:
         # posición dentro de la bodega (estante/casilla: A1, F6, CJ4…)
@@ -3511,7 +3812,8 @@ def escritorio():
     modo = request.args.get("modo", "")
     if modo not in ("principal", "vendedor"):
         modo = ""
-    html = render_template("escritorio.html", ip=ip_local(), c=cfg(), modo=modo)
+    html = render_template("escritorio.html", ip=ip_local(), c=cfg(), modo=modo,
+                           afuera=es_de_afuera(), usuario_afuera=g.get("usuario_afuera", ""))
     for viejo, nuevo in PALETAS.get(modo, {}).items():
         html = html.replace(viejo, nuevo).replace(viejo.lower(), nuevo)
     return html
@@ -3947,7 +4249,7 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "2.9"
+VERSION = "3.0"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
 PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida
@@ -4284,6 +4586,7 @@ if __name__ == "__main__":
     def correr():
         iniciar_respaldos()        # copia de seguridad diaria (solo quien sirve)
         iniciar_actualizaciones()  # se pone al dia solo cuando hay version nueva
+        iniciar_puerta_afuera()    # el 5001, para entrar desde internet con clave
         app.run(host="0.0.0.0", port=5000, debug=False)
     if "--sinventana" in sys.argv:
         # Modo PC SERVIDOR (siempre prendido): corre sin ventana y no se apaga

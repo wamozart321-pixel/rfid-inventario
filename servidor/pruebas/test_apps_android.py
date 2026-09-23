@@ -42,6 +42,16 @@ assert b"/api/quien" in d, "debe poder buscar el servidor en la red"
 assert b"escritorio?modo=vendedor" in d or b"?modo=vendedor" in d
 ok("busca el servidor sola y puede abrirse en modo vendedor")
 
+# --- fuera de la bodega: una segunda dirección (https) de reserva ---
+assert b"Direcci\xc3\xb3n para fuera de la bodega" in d, "falta la dirección de afuera"
+fuente = open(os.path.join(RAIZ, "android-movil", "app", "src", "main", "java", "com",
+                           "inventario", "movil", "MainActivity.kt"), encoding="utf-8").read()
+abrir = fuente.split("private fun abrir()")[1].split("private fun noConecta")[0]
+assert "quienEs(base(direccion))" in abrir and "usandoAfuera = !enBodega" in abrir, \
+    "al abrir debe probar PRIMERO la bodega y solo si no contesta ir por internet"
+assert "CookieManager.getInstance().flush()" in fuente, "la sesión de afuera debe guardarse"
+ok("la del celular prueba primero la bodega y, si no contesta, entra por internet")
+
 # --- pesa bastante menos que las de pistola ---
 gs = {n: os.path.getsize(os.path.join(RAIZ, n)) for n in
       ("InventarioRFID-C72.apk", "InventarioRFID-Movil.apk")}

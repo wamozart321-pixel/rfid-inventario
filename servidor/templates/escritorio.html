@@ -47,9 +47,9 @@ html[data-tema="oscuro"] img{filter:brightness(.94)}
 /* el papel de la etiqueta SIEMPRE es blanco: es lo que se va a imprimir */
 html[data-tema="oscuro"] #dis-etq,
 html[data-tema="oscuro"] #dis-etq *{filter:none}
-#btn-tema{display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:15px;
+#btn-tema,#btn-salir{display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:15px;
           border-left:1px solid var(--borde);user-select:none}
-#btn-tema:hover{background:var(--caja)}
+#btn-tema:hover,#btn-salir:hover{background:var(--caja)}
 #btn-escala{display:none;align-items:center;padding:0 11px;cursor:pointer;font-size:14px;
             font-weight:700;border-left:1px solid var(--borde);user-select:none}
 #btn-escala:hover{background:var(--caja)}
@@ -240,7 +240,7 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
        flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #marca{padding:0 12px;font-size:0}
   #marca::before{content:'☰';font-size:17px}
-  #btn-escala,#btn-tema{flex:none}
+  #btn-escala,#btn-tema,#btn-salir{flex:none}
   .bg{min-width:46px;max-width:62px;font-size:10px;gap:2px}
   .bg .ic{font-size:17px}
   #buscar{width:100%;margin:4px 0}
@@ -317,6 +317,7 @@ if(window.matchMedia){
   <div id="tira-info">{% if modo == 'vendedor' %}👁 SOLO CONSULTA (VENDEDORES) &nbsp;·&nbsp; {% elif modo == 'principal' %}🖥 PC PRINCIPAL &nbsp;·&nbsp; {% endif %}REPUESTOSVOLKSWAGENCOM SAS</div>
   <div id="btn-escala" onclick="ajustarEscala()" title="Tamaño de la pantalla">Aa</div>
   <div id="btn-tema" onclick="cambiarTema()" title="Cambiar entre claro y oscuro">🌙</div>
+  {% if afuera %}<div id="btn-salir" onclick="salirAfuera()" title="Cerrar la sesión en este equipo">🚪</div>{% endif %}
 </div>
 
 <!-- cinta: Productos -->
@@ -645,6 +646,9 @@ const IP_PISTOLA = 'http://{{ ip }}:5000';
 /* modo de esta ventana: '' = cliente (naranja) · 'principal' (rojo) ·
    'vendedor' (verde, SOLO consulta: sin modificar ni imprimir) */
 const MODO = '{{ modo }}';
+/* ¿se entró desde AFUERA de la bodega (por internet, con usuario y clave)? */
+const AFUERA = {{ 'true' if afuera else 'false' }};
+const USUARIO_AFUERA = '{{ usuario_afuera }}';
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const fmt = n => Number(n || 0).toLocaleString('es-CO');
@@ -656,6 +660,11 @@ async function api(url, datos){
     ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(datos)}
     : {});
   const j = await r.json().catch(() => ({}));
+  // desde afuera, si la sesión venció o la cerraron: a la página de entrar
+  if(r.status === 401 && j.entrar){
+    location.href = '/entrar?sig=' + encodeURIComponent(location.pathname + location.search);
+    throw new Error(j.error);
+  }
   if(!r.ok) throw new Error(j.error || j.msg || ('Error ' + r.status));
   return j;
 }
@@ -3842,6 +3851,15 @@ async function configUI(){
        una copia del inventario, y la versión anterior queda junto al programa por si hubiera
        que volver atrás. Los otros PCs no necesitan nada: cogen lo nuevo del servidor solos.</div>
      <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:12px 0 2px">
+       🌐 ACCESO DESDE AFUERA (celular fuera de la bodega)</div>
+     ${AFUERA
+       ? `<div class="hint" style="margin-bottom:8px">Los usuarios de afuera solo se manejan
+            desde un equipo de la bodega. Entraste como <b>${esc(USUARIO_AFUERA)}</b>.</div>`
+       : `<div style="display:flex;align-items:center;gap:8px;margin:4px 0 4px">
+            <button class="btn" type="button" onclick="usuariosAfuera()">👥 Usuarios de afuera…</button></div>
+          <div class="hint" style="margin-bottom:8px;line-height:1.5">En la bodega nadie tiene que
+            entrar con clave. Desde afuera solo entran estos usuarios.</div>`}
+     <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:12px 0 2px">
        COPIA DE SEGURIDAD (respaldo de los datos)</div>
      <label class="chk"><input type="checkbox" id="c-resp" ${c.respaldo_activo !== false ? 'checked' : ''}>
        Hacer una copia automática cada día</label>
@@ -3921,6 +3939,74 @@ async function configUI(){
       }catch(e){ toast('✖ ' + e.message); } }}]);
   cargarImpresorasWin(ov);
   pintarEstadoUpd(ov);
+}
+
+/* ---------------- acceso desde afuera ----------------
+   Quién puede entrar por internet. Solo se maneja desde la bodega. */
+function salirAfuera(){
+  modal('Cerrar sesión', `<p>¿Cerrar la sesión en este equipo? Para volver a entrar
+    desde afuera habrá que escribir el usuario y la contraseña.</p>`,
+    [{t:'Cancelar'}, {t:'Cerrar sesión', p:1, f:() => { location.href = '/salir'; }}]);
+}
+async function usuariosAfuera(){
+  let j;
+  try{ j = await api('/api/afuera'); }catch(e){ toast('✖ ' + e.message); return; }
+  const filas = j.usuarios.map(u => `<tr>
+      <td><b>${esc(u.usuario)}</b>${u.nombre ? `<div class="hint">${esc(u.nombre)}</div>` : ''}</td>
+      <td class="hint">${u.ultimo ? fecha(u.ultimo) : 'nunca'}<br>${u.equipos} equipo(s)</td>
+      <td style="white-space:nowrap;text-align:right">
+        <button class="btn" data-acc="clave" data-u="${esc(u.usuario)}" title="Cambiar la contraseña">🔑</button>
+        <button class="btn" data-acc="cerrar" data-u="${esc(u.usuario)}" title="Echar de todos sus equipos">🚪</button>
+        <button class="btn rojo" data-acc="borrar" data-u="${esc(u.usuario)}" title="Borrar el usuario">🗑</button>
+      </td></tr>`).join('');
+  const ov = modal('👥 Usuarios de afuera', `
+    <div class="hint" style="margin-bottom:10px;line-height:1.5">Solo estas personas pueden abrir el
+      inventario <b>desde fuera de la bodega</b>. Cada una entra una vez con su usuario y contraseña y su
+      equipo queda recordado 30 días. Si se pierde un celular, toca 🚪 para echarlo.</div>
+    ${j.usuarios.length
+      ? `<table style="margin-bottom:12px"><thead><tr><th>Usuario</th><th>Última vez</th><th></th></tr></thead>
+           <tbody>${filas}</tbody></table>`
+      : `<div class="hint" style="margin-bottom:12px"><b>Todavía no hay ninguno:</b> desde afuera
+           no puede entrar nadie.</div>`}
+    <div style="font-weight:700;font-size:11px;color:var(--tenue);letter-spacing:.5px;margin:4px 0 2px">
+      NUEVO USUARIO</div>
+    <div class="fila2">
+      <label>Usuario<input id="af-u" autocomplete="off" autocapitalize="none" placeholder="ej. carlos"></label>
+      <label>Nombre (opcional)<input id="af-n" autocomplete="off" placeholder="ej. Carlos vendedor"></label>
+    </div>
+    <label>Contraseña (mínimo 8)<input id="af-c" type="password" autocomplete="new-password"></label>
+    <div class="hint">Por dentro, el servidor escucha la entrada de afuera en el puerto
+      <b>${j.puerto}</b> de este PC${j.escuchando ? '' : ' <b>(todavía no está abierto: reinicia el programa)</b>'}.</div>`,
+    [{t:'Cerrar'}, {t:'Crear usuario', p:1, f:async ov2 => {
+      const q = x => ov2.querySelector(x);
+      try{
+        const r = await api('/api/afuera/guardar',
+          {usuario:q('#af-u').value.trim(), nombre:q('#af-n').value.trim(), clave:q('#af-c').value});
+        toast(r.msg); ov2.remove(); usuariosAfuera();
+      }catch(e){ toast('✖ ' + e.message); } }}]);
+  ov.querySelectorAll('button[data-acc]').forEach(b => b.onclick = () => {
+    const u = b.dataset.u;
+    if(b.dataset.acc === 'clave'){
+      modal('🔑 Contraseña nueva para ' + esc(u),
+        `<label>Contraseña nueva (mínimo 8)<input id="af-c2" type="password" autocomplete="new-password"></label>
+         <div class="hint">Sus equipos tendrán que volver a entrar con la nueva.</div>`,
+        [{t:'Cancelar'}, {t:'Guardar', p:1, f:async ov3 => {
+          try{
+            const r = await api('/api/afuera/guardar', {usuario:u, clave:ov3.querySelector('#af-c2').value});
+            toast(r.msg); ov3.remove(); ov.remove(); usuariosAfuera();
+          }catch(e){ toast('✖ ' + e.message); } }}]);
+    }else{
+      const borrar = b.dataset.acc === 'borrar';
+      modal(borrar ? '🗑 Borrar usuario' : '🚪 Echar de sus equipos',
+        borrar ? `<p>¿Borrar a <b>${esc(u)}</b>? Ya no podrá entrar desde afuera.</p>`
+               : `<p>¿Cerrar la sesión de <b>${esc(u)}</b> en todos sus equipos? Tendrá que volver a entrar.</p>`,
+        [{t:'Cancelar'}, {t:borrar ? 'Borrar' : 'Cerrar sesiones', r:1, f:async ov3 => {
+          try{
+            const r = await api(borrar ? '/api/afuera/borrar' : '/api/afuera/cerrar', {usuario:u});
+            toast(r.msg); ov3.remove(); ov.remove(); usuariosAfuera();
+          }catch(e){ toast('✖ ' + e.message); } }}]);
+    }
+  });
 }
 
 async function respaldarAhora(btn){

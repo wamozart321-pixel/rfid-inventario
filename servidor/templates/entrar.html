@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entrar · Inventario RFID</title>
+<style>
+/* Página para entrar DESDE AFUERA de la bodega. Dentro de la red no sale. */
+:root{--fondo:#F3F1EE;--caja:#fff;--texto:#222;--tenue:#6B6B6B;--borde:#D8D4CE;
+      --campo:#fff;--error-fondo:#FDECEA;--error:#A02A1E;--marca:#E87722;--marca2:#D0641B}
+@media (prefers-color-scheme: dark){
+  :root{--fondo:#17181A;--caja:#232427;--texto:#ECECEC;--tenue:#A0A0A0;--borde:#3A3B3F;
+        --campo:#1B1C1E;--error-fondo:#3A1F1C;--error:#FF9C90}
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+     background:var(--fondo);color:var(--texto);padding:16px;
+     font-family:"Segoe UI",Roboto,Arial,sans-serif}
+.caja{width:100%;max-width:360px;background:var(--caja);border:1px solid var(--borde);
+      border-radius:10px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.12)}
+.cab{background:var(--marca);color:#fff;padding:16px 20px;font-size:18px;font-weight:700}
+.cab small{display:block;font-size:12.5px;font-weight:400;opacity:.9;margin-top:2px}
+form,.nada{padding:18px 20px 20px}
+label{display:block;font-size:13px;color:var(--tenue);margin:0 0 12px}
+input{display:block;width:100%;margin-top:4px;padding:11px 12px;font-size:16px;
+      border:1px solid var(--borde);border-radius:6px;background:var(--campo);color:var(--texto)}
+input:focus{outline:2px solid var(--marca);border-color:transparent}
+button{width:100%;padding:12px;font-size:16px;font-weight:700;border:0;border-radius:6px;
+       background:var(--marca);color:#fff;cursor:pointer;margin-top:4px}
+button:active{background:var(--marca2)}
+.error{background:var(--error-fondo);color:var(--error);border-radius:6px;padding:9px 11px;
+       font-size:14px;margin-bottom:14px}
+.pie{font-size:12px;color:var(--tenue);line-height:1.5;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="caja">
+  <div class="cab">📦 Inventario RFID<small>{{ c.nombre_empresa }} · entrada desde afuera</small></div>
+  {% if not hay %}
+  <div class="nada">
+    <div class="error">El acceso desde afuera está <b>apagado</b>: todavía no hay ningún usuario.</div>
+    <div class="pie">Se crean en un PC de la bodega: <b>⚙ Configuración → Acceso desde afuera</b>.</div>
+  </div>
+  {% else %}
+  <form method="post" action="/entrar" autocomplete="on">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <input type="hidden" name="sig" value="{{ sig }}">
+    <label>Usuario
+      <input name="usuario" value="{{ usuario }}" autocomplete="username" autocapitalize="none"
+             autocorrect="off" spellcheck="false" required {% if not usuario %}autofocus{% endif %}></label>
+    <label>Contraseña
+      <input name="clave" type="password" autocomplete="current-password" required
+             {% if usuario %}autofocus{% endif %}></label>
+    <button type="submit">Entrar</button>
+    <div class="pie">Este equipo queda recordado 30 días. En la bodega no hace falta entrar.</div>
+  </form>
+  {% endif %}
+</div>
+</body>
+</html>

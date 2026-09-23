@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -32,6 +33,11 @@ import kotlin.concurrent.thread
  * La dirección del servidor se recuerda en el propio teléfono. Si el PC
  * principal cambia de IP, la app lo busca sola en la red: pregunta a cada
  * equipo por /api/quien y se queda con el que responda que es el inventario.
+ *
+ * FUERA DE LA BODEGA: se puede guardar además una dirección de internet
+ * (https://…, la del túnel). Al abrir se prueba primero la de la bodega y,
+ * si no contesta, se usa la de afuera; ahí el servidor pide usuario y
+ * contraseña, y la sesión queda guardada en el teléfono.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -46,7 +52,20 @@ class MainActivity : AppCompatActivity() {
         get() = prefs.getString("servidor", "") ?: ""
         set(v) = prefs.edit().putString("servidor", v).apply()
 
-    private val destino get() = "http://$direccion/escritorio" +
+    /** Dirección para fuera de la bodega (https://…). Vacía = no se usa. */
+    private var afuera: String
+        get() = prefs.getString("afuera", "") ?: ""
+        set(v) = prefs.edit().putString("afuera", v).apply()
+
+    /** La que se está usando ahora mismo: la de la bodega o la de afuera. */
+    private var usandoAfuera = false
+
+    private fun base(d: String) =
+        if (d.startsWith("http://") || d.startsWith("https://")) d.trimEnd('/') else "http://$d"
+
+    private val actual get() = if (usandoAfuera) afuera else direccion
+
+    private val destino get() = base(actual) + "/escritorio" +
         when (modo) {
             "principal" -> "?modo=principal"
             "vendedor" -> "?modo=vendedor"
@@ -81,17 +100,51 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnConfig).setOnClickListener { dialogoConfig() }
 
-        if (direccion.isBlank()) buscarServidor() else abrir()
+        if (direccion.isBlank() && afuera.isBlank()) buscarServidor() else abrir()
     }
 
+    /** Primero la bodega (rápido, sin clave); si no contesta, la de afuera. */
     private fun abrir() {
         estado.visibility = View.VISIBLE
-        estado.text = "Conectando con $direccion…"
-        web.loadUrl(destino)
+        if (afuera.isBlank() || direccion.isBlank()) {
+            usandoAfuera = direccion.isBlank()
+            estado.text = "Conectando con $actual…"
+            web.loadUrl(destino)
+            return
+        }
+        estado.text = "Buscando el servidor en la bodega…"
+        thread {
+            val enBodega = quienEs(base(direccion)) != null
+            ui.post {
+                usandoAfuera = !enBodega
+                estado.text = if (enBodega) "Conectando con $direccion…"
+                              else "Fuera de la bodega: conectando por internet…"
+                web.loadUrl(destino)
+            }
+        }
     }
 
     private fun noConecta() {
         estado.visibility = View.VISIBLE
+        if (usandoAfuera) {
+            // por internet no tiene sentido barrer la red de la casa o del café
+            AlertDialog.Builder(this)
+                .setTitle("Sin conexión")
+                .setMessage("No contesta el servidor por internet ($afuera).\n\n" +
+                            "Mira que el celular tenga datos o WiFi y que el PC " +
+                            "del inventario esté prendido.")
+                .setPositiveButton("Reintentar") { _, _ -> abrir() }
+                .setNeutralButton("Ajustes") { _, _ -> dialogoConfig() }
+                .setCancelable(false)
+                .show()
+            return
+        }
+        if (afuera.isNotBlank()) {
+            usandoAfuera = true
+            estado.text = "No contesta $direccion.\nProbando por internet…"
+            web.loadUrl(destino)
+            return
+        }
         estado.text = "No contesta $direccion.\nBuscando el servidor en la red…"
         buscarServidor()
     }
@@ -112,7 +165,7 @@ class MainActivity : AppCompatActivity() {
             for (n in 1..254) {
                 val ip = "$base$n"
                 pool.execute {
-                    quienEs(ip)?.let { hallados.add(ip to it) }
+                    quienEs("http://$ip:5000")?.let { hallados.add(ip to it) }
                 }
             }
             pool.shutdown()
@@ -145,13 +198,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** ¿Este equipo es el servidor del inventario? Devuelve el nombre del PC. */
-    private fun quienEs(ip: String): String? = try {
-        val c = URL("http://$ip:5000/api/quien").openConnection() as HttpURLConnection
+    /** ¿En esa dirección está el servidor del inventario? Devuelve el nombre del PC. */
+    private fun quienEs(dir: String): String? = try {
+        val c = URL("$dir/api/quien").openConnection() as HttpURLConnection
         c.connectTimeout = 900
         c.readTimeout = 900
         val j = JSONObject(c.inputStream.bufferedReader().readText())
-        if (j.optBoolean("inventario")) j.optString("nombre", ip) else null
+        if (j.optBoolean("inventario")) j.optString("nombre", dir) else null
     } catch (e: Exception) {
         null
     }
@@ -180,13 +233,39 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Conectar") { _, _ ->
                 var d = campo.text.toString().trim()
                 if (d.isNotBlank()) {
-                    if (!d.contains(":")) d += ":5000"
-                    direccion = d
+                    if (d.startsWith("https://")) {
+                        afuera = d.trimEnd('/')     // es la de internet
+                    } else {
+                        d = d.removePrefix("http://").trimEnd('/')
+                        if (!d.contains(":")) d += ":5000"
+                        direccion = d
+                    }
                     abrir()
                 }
             }
             .setNeutralButton("Buscar otra vez") { _, _ -> buscarServidor() }
             .setCancelable(false)
+            .show()
+    }
+
+    /** La dirección de internet (la del túnel) para cuando se está fuera. */
+    private fun pedirAfuera() {
+        val campo = EditText(this).apply {
+            hint = "https://inventario.xxxx.ts.net"
+            setText(afuera)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Dirección para fuera de la bodega")
+            .setMessage("La que te dieron para entrar por internet. En la bodega se " +
+                        "sigue usando la de siempre. Déjala vacía para no usarla.")
+            .setView(campo)
+            .setPositiveButton("Guardar") { _, _ ->
+                var d = campo.text.toString().trim().trimEnd('/')
+                if (d.isNotBlank() && !d.startsWith("http")) d = "https://$d"
+                afuera = d
+                abrir()
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
 
@@ -201,10 +280,11 @@ class MainActivity : AppCompatActivity() {
             .setItems(arrayOf("Cambiar la dirección del servidor",
                               "Buscar el servidor en la red",
                               "Para qué se usa este equipo",
-                              "Recargar la pantalla")) { _, i ->
+                              "Recargar la pantalla",
+                              "Dirección para fuera de la bodega")) { _, i ->
                 when (i) {
                     0 -> pedirDireccion("Escribe la dirección del PC principal:")
-                    1 -> buscarServidor()
+                    1 -> { usandoAfuera = false; buscarServidor() }
                     2 -> AlertDialog.Builder(this)
                         .setTitle("Para qué se usa este equipo")
                         .setSingleChoiceItems(modos, claves.indexOf(modo)) { d, j ->
@@ -213,9 +293,16 @@ class MainActivity : AppCompatActivity() {
                             abrir()
                         }.show()
                     3 -> abrir()
+                    4 -> pedirAfuera()
                 }
             }
             .show()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // que la sesión de afuera no se pierda si Android cierra la app
+        CookieManager.getInstance().flush()
     }
 
     @Deprecated("Se necesita el comportamiento clásico del botón atrás")
