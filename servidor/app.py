@@ -2249,6 +2249,124 @@ def descargar_archivo(nombre):
             if nombre.lower().endswith(".apk") else None)
     return send_file(ruta, mimetype=tipo, as_attachment=True, download_name=nombre)
 
+# ---------------------------------------------------------------- apps de Android al día
+# Las apps (pistolas y celular) preguntan al abrir qué versión tiene el
+# servidor en /api/apps/versiones. Si hay una más nueva la descargan y Android
+# muestra «Actualizar» (sin permiso de empresa no se puede instalar sin tocar).
+# Las APK nuevas viajan DENTRO del programa del servidor (carpeta «apks»), así
+# que cuando el servidor se actualiza solo, las apps se enteran solas.
+APKS_INCLUIDAS = os.path.join(RECURSOS, "apks")
+ATTR_VERSION_CODE, ATTR_VERSION_NAME = 0x0101021b, 0x0101021c
+_cache_apk = {}
+
+
+def leer_version_apk(ruta):
+    """(paquete, versionCode, versionName) del AndroidManifest.xml compilado
+    de una APK. Se lee el XML binario de Android a mano: no hace falta tener
+    las herramientas de Android instaladas en el servidor."""
+    import struct
+    import zipfile
+    st = os.stat(ruta)
+    clave = (ruta, st.st_mtime, st.st_size)
+    if clave in _cache_apk:
+        return _cache_apk[clave]
+    with zipfile.ZipFile(ruta) as z:
+        b = z.read("AndroidManifest.xml")
+    u16 = lambda o: struct.unpack_from("<H", b, o)[0]
+    u32 = lambda o: struct.unpack_from("<I", b, o)[0]
+    textos, recursos = [], []
+    o = u16(2)                               # tras la cabecera del documento
+    while o < len(b):
+        tipo, cab, tam = u16(o), u16(o + 2), u32(o + 4)
+        if tam <= 0:
+            break
+        if tipo == 0x0001:                   # tabla de textos
+            n, flags, ini = u32(o + 8), u32(o + 16), u32(o + 20)
+            utf8 = bool(flags & 0x100)
+            for i in range(n):
+                p = o + ini + u32(o + cab + 4 * i)
+                if utf8:
+                    p += 2 if b[p] & 0x80 else 1                 # largo en UTF-16
+                    lb = b[p]
+                    if lb & 0x80:
+                        lb, p = ((lb & 0x7F) << 8) | b[p + 1], p + 2
+                    else:
+                        p += 1
+                    textos.append(b[p:p + lb].decode("utf-8", "replace"))
+                else:
+                    lc = u16(p)
+                    if lc & 0x8000:
+                        lc, p = ((lc & 0x7FFF) << 16) | u16(p + 2), p + 4
+                    else:
+                        p += 2
+                    textos.append(b[p:p + 2 * lc].decode("utf-16-le", "replace"))
+        elif tipo == 0x0180:                 # a qué atributo de Android es cada texto
+            recursos = [u32(o + 8 + 4 * i) for i in range((tam - 8) // 4)]
+        elif tipo == 0x0102:                 # un elemento: el primero es <manifest>
+            nombre = textos[u32(o + 20)] if u32(o + 20) < len(textos) else ""
+            if nombre == "manifest":
+                a0, asz, an = u16(o + 24), u16(o + 26), u16(o + 28)
+                paquete, vcode, vname = "", 0, ""
+                for i in range(an):
+                    a = o + 16 + a0 + i * asz
+                    ni, crudo, dtipo, dato = u32(a + 4), u32(a + 8), b[a + 15], u32(a + 16)
+                    rid = recursos[ni] if ni < len(recursos) else 0
+                    nom = textos[ni] if ni < len(textos) else ""
+                    texto = textos[crudo] if crudo < len(textos) else (
+                        textos[dato] if dtipo == 0x03 and dato < len(textos) else str(dato))
+                    if rid == ATTR_VERSION_CODE or nom == "versionCode":
+                        vcode = dato if dtipo != 0x03 else int(texto or 0)
+                    elif rid == ATTR_VERSION_NAME or nom == "versionName":
+                        vname = texto
+                    elif nom == "package":
+                        paquete = texto
+                _cache_apk[clave] = (paquete, vcode, vname)
+                return _cache_apk[clave]
+        o += tam
+    raise ValueError("no parece una APK: sin <manifest>")
+
+
+def sincronizar_apks():
+    """Pasa a «subidos» las APK que trae el programa si son más nuevas que
+    las que hay (nunca pisa una más nueva que alguien subiera a mano)."""
+    if not os.path.isdir(APKS_INCLUIDAS):
+        return []
+    os.makedirs(SUBIDOS, exist_ok=True)
+    puestas = []
+    for n in sorted(os.listdir(APKS_INCLUIDAS)):
+        if not n.lower().endswith(".apk"):
+            continue
+        origen, destino = os.path.join(APKS_INCLUIDAS, n), os.path.join(SUBIDOS, n)
+        try:
+            nueva = leer_version_apk(origen)[1]
+            vieja = leer_version_apk(destino)[1] if os.path.exists(destino) else -1
+        except Exception as e:
+            print("  APK %s: %s" % (n, e))
+            continue
+        if nueva > vieja:
+            shutil.copy2(origen, destino + ".nueva")
+            os.replace(destino + ".nueva", destino)
+            puestas.append(n)
+    return puestas
+
+
+@app.get("/api/apps/versiones")
+def api_apps_versiones():
+    """Qué versión de cada app hay en el servidor, para que se actualicen."""
+    apps = []
+    if os.path.isdir(SUBIDOS):
+        for n in sorted(os.listdir(SUBIDOS)):
+            if not n.lower().endswith(".apk"):
+                continue
+            try:
+                paquete, vcode, vname = leer_version_apk(os.path.join(SUBIDOS, n))
+            except Exception:
+                continue
+            apps.append(dict(archivo=n, paquete=paquete, version_code=vcode,
+                             version=vname, url="/descargar/" + n,
+                             bytes=os.path.getsize(os.path.join(SUBIDOS, n))))
+    return jsonify(ok=True, apps=apps)
+
 @app.get("/api/estado")
 def api_estado():
     d = db(); s = sesion_activa(d)
@@ -4249,7 +4367,7 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "3.0"
+VERSION = "3.1"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
 PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida
@@ -4587,6 +4705,11 @@ if __name__ == "__main__":
         iniciar_respaldos()        # copia de seguridad diaria (solo quien sirve)
         iniciar_actualizaciones()  # se pone al dia solo cuando hay version nueva
         iniciar_puerta_afuera()    # el 5001, para entrar desde internet con clave
+        try:
+            for n in sincronizar_apks():   # las apps nuevas que trae esta versión
+                print("  App de Android puesta al día: " + n)
+        except Exception as e:
+            print("  No se pudieron poner al día las apps: %s" % e)
         app.run(host="0.0.0.0", port=5000, debug=False)
     if "--sinventana" in sys.argv:
         # Modo PC SERVIDOR (siempre prendido): corre sin ventana y no se apaga

@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity() {
             usandoAfuera = direccion.isBlank()
             estado.text = "Conectando con $actual…"
             web.loadUrl(destino)
+            revisarApp()
             return
         }
         estado.text = "Buscando el servidor en la bodega…"
@@ -120,6 +121,7 @@ class MainActivity : AppCompatActivity() {
                 estado.text = if (enBodega) "Conectando con $direccion…"
                               else "Fuera de la bodega: conectando por internet…"
                 web.loadUrl(destino)
+                revisarApp()
             }
         }
     }
@@ -281,7 +283,8 @@ class MainActivity : AppCompatActivity() {
                               "Buscar el servidor en la red",
                               "Para qué se usa este equipo",
                               "Recargar la pantalla",
-                              "Dirección para fuera de la bodega")) { _, i ->
+                              "Dirección para fuera de la bodega",
+                              "Buscar actualización de la app")) { _, i ->
                 when (i) {
                     0 -> pedirDireccion("Escribe la dirección del PC principal:")
                     1 -> { usandoAfuera = false; buscarServidor() }
@@ -294,9 +297,24 @@ class MainActivity : AppCompatActivity() {
                         }.show()
                     3 -> abrir()
                     4 -> pedirAfuera()
+                    5 -> revisarApp(forzar = true)
                 }
             }
             .show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Actualizador.alVolver(this)
+        revisarApp()
+    }
+
+    /** La app se pone al día sola desde el servidor (android-comun/Actualizador.kt).
+     *  Desde afuera se le pasa la sesión, porque allí el servidor pide entrar. */
+    private fun revisarApp(forzar: Boolean = false) {
+        if (actual.isBlank()) return
+        val galleta = if (usandoAfuera) CookieManager.getInstance().getCookie(base(afuera)) else null
+        Actualizador.revisar(this, base(actual), galleta, forzar)
     }
 
     override fun onPause() {

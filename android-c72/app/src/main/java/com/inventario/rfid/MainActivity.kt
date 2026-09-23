@@ -964,6 +964,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
+    override fun onResume() {
+        super.onResume()
+        // la app se pone al día sola desde el servidor (android-comun/Actualizador.kt)
+        Actualizador.alVolver(this)
+        Actualizador.revisar(this, urlServidor)
+    }
+
     override fun onDestroy() {
         detener()
         uhf?.free()

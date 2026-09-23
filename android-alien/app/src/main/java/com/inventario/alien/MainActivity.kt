@@ -893,6 +893,13 @@ class MainActivity : Activity(), RFIDCallback {
         AlertDialog.Builder(this).setTitle(t).setMessage(m).setPositiveButton("OK", null).show()
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
 
+    override fun onResume() {
+        super.onResume()
+        // la app se pone al día sola desde el servidor (android-comun/Actualizador.kt)
+        Actualizador.alVolver(this)
+        Actualizador.revisar(this, urlServidor)
+    }
+
     override fun onDestroy() {
         try { detener() } catch (_: Throwable) {}
         try { barcode?.stop() } catch (_: Throwable) {}

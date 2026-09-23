@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- para ponerse al día sola desde el servidor -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 
@@ -19,5 +21,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- le pasa la actualización descargada al instalador de Android -->
+        <provider android:name="com.inventario.movil.ApkProvider"
+            android:authorities="com.inventario.movil.apk"
+            android:exported="false"
+            android:grantUriPermissions="true"/>
     </application>
 </manifest>
