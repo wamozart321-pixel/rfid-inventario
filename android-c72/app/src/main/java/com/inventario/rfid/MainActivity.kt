@@ -206,8 +206,7 @@ class MainActivity : AppCompatActivity() {
         if (si) {
             if (leyendo) detener()      // no se lee a ciegas mientras se consulta
             prepararWeb()
-            val destino = "$urlServidor/escritorio"
-            if (web?.url == null) web?.loadUrl(destino)
+            if (web?.url == null) abrirInventario()
         }
     }
 
@@ -828,6 +827,100 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancelar", null).show()
     }
 
+    // ------------------------------------------------ pantalla del inventario
+    /** Dónde se está viendo ahora el inventario: la bodega o por internet. */
+    private var usandoAfuera = false
+
+    private fun respondeServidor(base: String): Boolean = try {
+        val c = URL("$base/api/quien").openConnection() as HttpURLConnection
+        c.connectTimeout = 1500; c.readTimeout = 1500
+        val ok = c.responseCode == 200 && JSONObject(c.inputStream.bufferedReader().readText())
+            .optBoolean("inventario")
+        c.disconnect(); ok
+    } catch (_: Throwable) { false }
+
+    /** Abre la pantalla del inventario con el modo elegido. Primero el servidor
+     *  de la bodega; si no contesta y hay dirección de afuera, por internet
+     *  (allí el servidor pide usuario y contraseña). */
+    private fun abrirInventario() {
+        val w = web ?: return
+        val q = when (prefs.getString("modo", "")) {
+            "principal" -> "?modo=principal"
+            "vendedor" -> "?modo=vendedor"
+            else -> ""
+        }
+        val afuera = prefs.getString("afuera", "") ?: ""
+        if (afuera.isBlank()) {
+            usandoAfuera = false
+            w.loadUrl("$urlServidor/escritorio$q")
+            return
+        }
+        thread {
+            val enBodega = respondeServidor(urlServidor)
+            ui.post {
+                usandoAfuera = !enBodega
+                w.loadUrl((if (enBodega) urlServidor else afuera) + "/escritorio" + q)
+            }
+        }
+    }
+
+    private fun buscarActualizacion() {
+        val afuera = prefs.getString("afuera", "") ?: ""
+        if (usandoAfuera && afuera.isNotBlank())
+            Actualizador.revisar(this, afuera,
+                android.webkit.CookieManager.getInstance().getCookie(afuera), forzar = true)
+        else Actualizador.revisar(this, urlServidor, forzar = true)
+    }
+
+    /** Lo que tenía la app del celular y faltaba aquí: para qué se usa el
+     *  equipo, la dirección de afuera, recargar y buscar actualización. */
+    private inner class AjustesPantalla(cont: LinearLayout) {
+        private val claves = arrayOf("", "principal", "vendedor")
+        private val spModo = Spinner(this@MainActivity).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                arrayOf("Mostrador (consultar y modificar)", "PC principal (además, Configuración)",
+                        "Vendedor (solo consulta)"))
+            setSelection(maxOf(0, claves.indexOf(prefs.getString("modo", "") ?: "")))
+        }
+        private val inAfuera = EditText(this@MainActivity).apply {
+            hint = "Dirección para fuera de la bodega (https://…)"
+            setText(prefs.getString("afuera", ""))
+        }
+
+        init {
+            fun nota(t: String) = TextView(this@MainActivity).apply { text = t; textSize = 12f }
+            cont.addView(TextView(this@MainActivity).apply {
+                text = "\n📋 Pantalla del inventario"; textSize = 15f
+            })
+            cont.addView(nota("Para qué se usa este equipo:"))
+            cont.addView(spModo)
+            cont.addView(inAfuera)
+            cont.addView(nota("Solo para ver el inventario fuera de la bodega (pide usuario y " +
+                              "contraseña). Leer y enviar sigue siendo con el servidor de la bodega."))
+            cont.addView(Button(this@MainActivity).apply {
+                text = "↻ Recargar la pantalla del inventario"
+                setOnClickListener { abrirInventario() }
+            })
+            cont.addView(Button(this@MainActivity).apply {
+                text = "🔄 Buscar actualización de la app"
+                setOnClickListener { buscarActualizacion() }
+            })
+        }
+
+        fun guardar() {
+            var a = inAfuera.text.toString().trim().trimEnd('/')
+            if (a.isNotEmpty() && !a.startsWith("http")) a = "https://$a"
+            prefs.edit().putString("afuera", a).putString("modo", claves[spModo.selectedItemPosition]).apply()
+            if (web?.url != null) abrirInventario()      // que se vea ya con lo nuevo
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // que la sesión de afuera no se pierda si Android cierra la app
+        if (android.os.Build.VERSION.SDK_INT >= 21) android.webkit.CookieManager.getInstance().flush()
+    }
+
     private fun dialogoConfig() {
         val cont = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 20, 40, 0) }
         val inUrl = EditText(this).apply { hint = "URL servidor"; setText(urlServidor) }
@@ -848,7 +941,8 @@ class MainActivity : AppCompatActivity() {
         val btnBuscar = Button(this).apply { text = "🔍 Buscar el servidor en la red"; setOnClickListener { buscarServidores(inUrl) } }
         val chkBeep = CheckBox(this).apply { text = "🔊 Pitido al leer"; isChecked = prefs.getBoolean("beep", true) }
         cont.addView(inUrl); cont.addView(btnBuscar); cont.addView(inNom); cont.addView(lblPot); cont.addView(barPot); cont.addView(chkBeep)
-        AlertDialog.Builder(this).setTitle("Configuración").setView(cont)
+        val ajPant = AjustesPantalla(cont)
+        AlertDialog.Builder(this).setTitle("Configuración").setView(ScrollView(this).apply { addView(cont) })
             .setPositiveButton("Guardar") { _, _ ->
                 var u = inUrl.text.toString().trim().trimEnd('/')
                 if (u.isNotEmpty() && !u.startsWith("http")) u = "http://$u"
@@ -859,6 +953,7 @@ class MainActivity : AppCompatActivity() {
                 thread { try { uhf?.setPower(pot) } catch (_: Throwable) {} }
                 estado.text = "Config guardada · alcance $pot dBm"
                 refrescarCatalogo()
+                ajPant.guardar()
             }.setNegativeButton("Cancelar", null).show()
     }
 

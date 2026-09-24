@@ -9,8 +9,8 @@ android {
         applicationId "com.inventario.rfid"
         minSdk 21          // C72 trae Android 8/9/11 según versión
         targetSdk 34
-        versionCode 17
-        versionName "2.6"
+        versionCode 18
+        versionName "2.7"
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = '17' }

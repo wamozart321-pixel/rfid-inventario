@@ -64,6 +64,24 @@ lay = open(os.path.join(RAIZ, "android-movil", "app", "src", "main", "res", "lay
 assert "btnConfig" not in lay, "la app del celular ya no lleva la barra con el ⚙ arriba"
 ok("las tres apps abren sus ajustes desde el ⚙ de la pantalla; el celular sin barra arriba")
 
+# --- en las pistolas, esos ajustes son los de siempre MÁS lo del celular ---
+for carpeta, paq in (("android-c72", "rfid"), ("android-alien", "alien")):
+    kt = open(os.path.join(RAIZ, carpeta, "app", "src", "main", "java", "com", "inventario", paq,
+                           "MainActivity.kt"), encoding="utf-8").read()
+    cfg = kt.split("private fun dialogoConfig()")[1].split("\n    private fun ")[0]
+    for de_siempre in ("URL servidor", "Buscar el servidor en la red", "Nombre equipo",
+                       "barPot", "Pitido al leer"):
+        assert de_siempre in cfg, "%s: se perdió «%s» de la Configuración" % (carpeta, de_siempre)
+    assert "AjustesPantalla(cont)" in cfg and "ajPant.guardar()" in cfg, carpeta
+    assert "ScrollView" in cfg, carpeta + ": la Configuración debe poder desplazarse (pantalla chica)"
+    nuevo = kt.split("inner class AjustesPantalla")[1][:2600]
+    for t in ("Para qué se usa este equipo", "fuera de la bodega", "Recargar la pantalla del inventario",
+              "Buscar actualización de la app"):
+        assert t in nuevo, "%s: falta «%s»" % (carpeta, t)
+    assert "abrirInventario()" in kt.split("private fun mostrarInventario")[1][:1600], carpeta
+ok("pistolas: la Configuración conserva servidor, alcance y pitido, y suma modo, "
+   "dirección de afuera, recargar y buscar actualización")
+
 # --- pesa bastante menos que las de pistola ---
 gs = {n: os.path.getsize(os.path.join(RAIZ, n)) for n in
       ("InventarioRFID-C72.apk", "InventarioRFID-Movil.apk")}
