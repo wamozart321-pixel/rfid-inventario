@@ -33,3 +33,6 @@ desktop.ini
 # Paginas web guardadas a mano (pueden traer datos personales)
 conversacion.html
 *-guardado.html
+
+# Herramientas de Node (se reinstalan con npm install)
+node_modules/

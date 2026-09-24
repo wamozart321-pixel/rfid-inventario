@@ -141,9 +141,10 @@ tbody tr.sel{background:#FCE0C6!important;box-shadow:inset 3px 0 0 #E87722}
 .btn.rojo:hover{background:#A82940}
 .btn.mini{padding:2px 10px;font-size:12px}
 .btn:disabled{opacity:.55;cursor:default}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;
+/* sin «inset» ni «min()»: la Alien (Android 4.4) no los entiende */
+.overlay{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.35);display:flex;align-items:center;
          justify-content:center;z-index:50}
-.modal{background:var(--fondo);width:min(480px,92vw);max-height:88vh;overflow:auto;border-radius:6px;
+.modal{background:var(--fondo);width:92vw;max-width:480px;max-height:88vh;overflow:auto;border-radius:6px;
        box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .m-tit{background:#E87722;color:#fff;padding:9px 14px;font-weight:600;display:flex;align-items:center;
        position:sticky;top:0}
@@ -184,7 +185,7 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
 .dis-item input{width:auto!important;flex:none;accent-color:#E87722}
 .dis-item .di-ic{width:20px;text-align:center;flex:none;font-size:13px}
 /* etiqueta editable con render real de fondo */
-#dis-etq .real-img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#dis-etq .real-img{position:absolute;top:0;right:0;bottom:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1}
 #dis-etq [data-k]{z-index:2}
 #dis-etq.con-img .di-cont{opacity:0}
 #dis-etq.con-img [data-k]:hover{outline:1px dashed rgba(232,119,34,.55);outline-offset:2px}
@@ -1348,7 +1349,7 @@ async function buscarImpresoraSat(){
          (la Zebra ya está descartada). Elige uno y luego imprime una prueba en
          🎨 Diseño → pestaña 📝 Descripción; si no sale, prueba con otro.</div>` +
         cand.map(x => `<button class="btn" style="display:block;width:100%;margin-top:6px"
-          onclick="const i=document.getElementById('c-sat-ip');if(i)i.value='${x.ip}';this.closest('.overlay').remove()">
+          onclick="var i=document.getElementById('c-sat-ip');if(i)i.value='${x.ip}';this.closest('.overlay').remove()">
           ${x.ip}${x.modelo ? ' — ' + esc(x.modelo) : ''}</button>`).join(''),
         [{t:'Cerrar', p:1}]);
     }
@@ -2004,7 +2005,7 @@ function nuevaSesion(){
        </select>
      </label>
      <label>Productos a contar
-       <select id="f-ses-que" onchange="const p=document.getElementById('f-ses-pick');
+       <select id="f-ses-que" onchange="var p=document.getElementById('f-ses-pick');
                p.style.display=this.value==='algunos'?'':'none';">
          <option value="todos">Todos los productos</option>
          <option value="algunos">Solo los que yo elija…</option>
@@ -3332,7 +3333,7 @@ function dibujarEtiqueta(desdeRender){
 
   if(diseno.borde.on){
     const b = document.createElement('div');
-    b.style.cssText = `position:absolute;inset:${2*esc}px;border:${Math.max(1,2*esc)}px solid #000;
+    b.style.cssText = `position:absolute;top:${2*esc}px;right:${2*esc}px;bottom:${2*esc}px;left:${2*esc}px;border:${Math.max(1,2*esc)}px solid #000;
       border-radius:${rad*0.9}px;pointer-events:none`;
     etq.appendChild(b);
   }

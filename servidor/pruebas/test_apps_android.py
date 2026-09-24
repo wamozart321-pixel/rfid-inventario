@@ -82,6 +82,17 @@ for carpeta, paq in (("android-c72", "rfid"), ("android-alien", "alien")):
 ok("pistolas: la Configuración conserva servidor, alcance y pitido, y suma modo, "
    "dirección de afuera, recargar y buscar actualización")
 
+# --- la Alien es Android 4.4: nada que no exista ahí ---
+# «backgroundTintList» (Android 5+) cerraba la app al abrir el Inventario.
+alien = open(os.path.join(RAIZ, "android-alien", "app", "src", "main", "java", "com", "inventario",
+                          "alien", "MainActivity.kt"), encoding="utf-8").read()
+codigo = "\n".join(l for l in alien.splitlines() if not l.strip().startswith(("//", "*", "/*")))
+for moderno in ("backgroundTintList", "setBackgroundTintList", "foregroundTintList",
+                "setElevation", "requireViewById"):
+    assert moderno not in codigo, "la Alien (Android 4.4) no tiene «%s»: la app se cierra" % moderno
+assert "pintarPestanas" in alien
+ok("la Alien no usa nada de Android 5 o más (la cerraba al abrir el Inventario)")
+
 # --- pesa bastante menos que las de pistola ---
 gs = {n: os.path.getsize(os.path.join(RAIZ, n)) for n in
       ("InventarioRFID-C72.apk", "InventarioRFID-Movil.apk")}

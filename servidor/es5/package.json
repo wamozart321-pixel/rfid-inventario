@@ -1,0 +1,18 @@
+{
+  "name": "inventario-es5",
+  "private": true,
+  "description": "Traduce la pantalla del inventario a JavaScript viejo para la pistola Alien (Android 4.4). Uso: npm install && node construir.mjs",
+  "scripts": {
+    "construir": "node construir.mjs"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.6",
+    "@babel/preset-env": "^8.0.6",
+    "acorn": "^8.18.0",
+    "core-js-bundle": "^3.50.0",
+    "postcss": "^8.5.28",
+    "postcss-custom-properties": "^15.0.1",
+    "regenerator-runtime": "^0.14.1",
+    "whatwg-fetch": "^3.6.20"
+  }
+}

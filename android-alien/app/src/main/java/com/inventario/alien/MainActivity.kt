@@ -144,22 +144,28 @@ class MainActivity : Activity(), RFIDCallback {
         web = w
     }
 
+    /** Colorea la pestaña activa (naranja) y la otra (gris).
+     *  OJO: la Alien es Android 4.4 y «backgroundTintList» no existe hasta
+     *  Android 5: usarlo cerraba la app al abrir el Inventario. Aquí se tiñe
+     *  el fondo de una forma que sirve en todas las versiones. */
+    private fun pintarPestanas(enInv: Boolean) {
+        fun pintar(id: Int, activa: Boolean) {
+            val b = findViewById<Button>(id)
+            val fondo = android.graphics.Color.parseColor(if (activa) "#F5A623" else "#37474F")
+            b.background?.mutate()?.setColorFilter(fondo, android.graphics.PorterDuff.Mode.SRC_ATOP)
+            b.setTextColor(android.graphics.Color.parseColor(if (activa) "#14181D" else "#FFFFFF"))
+        }
+        pintar(R.id.tabLeer, !enInv)
+        pintar(R.id.tabInventario, enInv)
+    }
+
     private fun mostrarInventario(si: Boolean) {
         enInventario = si
         findViewById<android.view.View>(R.id.pantallaInventario).visibility =
             if (si) android.view.View.VISIBLE else android.view.View.GONE
         findViewById<android.view.View>(R.id.pantallaLeer).visibility =
             if (si) android.view.View.GONE else android.view.View.VISIBLE
-        findViewById<Button>(R.id.tabLeer).backgroundTintList =
-            android.content.res.ColorStateList.valueOf(
-                android.graphics.Color.parseColor(if (si) "#37474F" else "#F5A623"))
-        findViewById<Button>(R.id.tabLeer).setTextColor(
-            android.graphics.Color.parseColor(if (si) "#FFFFFF" else "#14181D"))
-        findViewById<Button>(R.id.tabInventario).backgroundTintList =
-            android.content.res.ColorStateList.valueOf(
-                android.graphics.Color.parseColor(if (si) "#F5A623" else "#37474F"))
-        findViewById<Button>(R.id.tabInventario).setTextColor(
-            android.graphics.Color.parseColor(if (si) "#14181D" else "#FFFFFF"))
+        pintarPestanas(si)
         if (si) {
             if (leyendo) detener()      // no se lee a ciegas mientras se consulta
             prepararWeb()
@@ -191,6 +197,7 @@ class MainActivity : Activity(), RFIDCallback {
         btnLeer.setOnClickListener { if (leyendo) detener() else iniciar() }
         findViewById<Button>(R.id.tabLeer).setOnClickListener { mostrarInventario(false) }
         findViewById<Button>(R.id.tabInventario).setOnClickListener { mostrarInventario(true) }
+        pintarPestanas(false)          // en Android 4.4 el color del diseño no se aplica solo
         lista.setOnItemClickListener { _, _, pos, _ ->
             val sku = skusMostrados.getOrNull(pos) ?: return@setOnItemClickListener
             detalleRepuesto(sku)

@@ -3922,6 +3922,20 @@ PALETAS = {
     },
 }
 
+def navegador_viejo():
+    """¿Es un navegador de antes de 2017 (p. ej. la Alien, Android 4.4)?
+    Esos no entienden el JavaScript de la pantalla y la verían en blanco: se
+    les da la copia traducida (escritorio_es5.html, ver servidor/es5/).
+    Con ?es5=1 se fuerza, para probarla desde cualquier navegador."""
+    if request.args.get("es5") == "1":
+        return True
+    ua = request.headers.get("User-Agent", "")
+    m = re.search(r"Chrome/(\d+)", ua)
+    if m:
+        return int(m.group(1)) < 61
+    return bool(re.search(r"Android [1-4]\.", ua))
+
+
 @app.get("/escritorio")
 def escritorio():
     """Interfaz de la ventana de PC, estilo FactuSOL (Productos e Inventario).
@@ -3930,7 +3944,8 @@ def escritorio():
     modo = request.args.get("modo", "")
     if modo not in ("principal", "vendedor"):
         modo = ""
-    html = render_template("escritorio.html", ip=ip_local(), c=cfg(), modo=modo,
+    plantilla = "escritorio_es5.html" if navegador_viejo() else "escritorio.html"
+    html = render_template(plantilla, ip=ip_local(), c=cfg(), modo=modo,
                            afuera=es_de_afuera(), usuario_afuera=g.get("usuario_afuera", ""))
     for viejo, nuevo in PALETAS.get(modo, {}).items():
         html = html.replace(viejo, nuevo).replace(viejo.lower(), nuevo)
@@ -4367,7 +4382,7 @@ def iniciar_respaldos():
 # ---------------------------------------------------------------- actualizaciones
 # El programa mira solo si hay una versión nueva publicada en el repositorio y,
 # si está activado, se actualiza y se reinicia sin que nadie haga nada.
-VERSION = "3.3"
+VERSION = "3.4"
 REPO_ACTUALIZACIONES = "wamozart321-pixel/rfid-inventario"
 NOMBRE_EXE = "ServidorInventarioRFID.exe"
 PRIMERA_REVISION_SEG = 15     # al abrir el programa se mira casi enseguida
