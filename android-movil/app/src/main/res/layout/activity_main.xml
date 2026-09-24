@@ -1,20 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Sin barra de arriba: el ⚙ de los ajustes está dentro de la pantalla del
+     inventario, junto a la 🌙. El aviso de «Conectando…» solo se ve mientras
+     carga (y tocarlo también abre los ajustes). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent" android:layout_height="match_parent"
     android:background="#14181D">
 
-    <LinearLayout android:orientation="horizontal"
-        android:layout_width="match_parent" android:layout_height="wrap_content">
-        <TextView android:id="@+id/estado" android:text="Conectando…"
-            android:textColor="#8695A5" android:textSize="13sp" android:padding="10dp"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="wrap_content"/>
-        <Button android:id="@+id/btnConfig" android:text="⚙"
-            android:textSize="16sp" android:backgroundTint="#37474F" android:textColor="#FFFFFF"
-            android:minWidth="0dp" android:layout_margin="6dp"
-            android:layout_width="52dp" android:layout_height="44dp"/>
-    </LinearLayout>
+    <TextView android:id="@+id/estado" android:text="Conectando…  (toca aquí para los ajustes)"
+        android:textColor="#8695A5" android:textSize="13sp" android:padding="12dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content"/>
 
     <WebView android:id="@+id/web"
         android:layout_width="match_parent" android:layout_height="0dp"

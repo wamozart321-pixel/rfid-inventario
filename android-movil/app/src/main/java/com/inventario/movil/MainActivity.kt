@@ -60,6 +60,9 @@ class MainActivity : AppCompatActivity() {
     /** La que se está usando ahora mismo: la de la bodega o la de afuera. */
     private var usandoAfuera = false
 
+    /** Cortes seguidos al cargar la pantalla (se reintenta antes de buscar). */
+    private var fallos = 0
+
     private fun base(d: String) =
         if (d.startsWith("http://") || d.startsWith("https://")) d.trimEnd('/') else "http://$d"
 
@@ -89,16 +92,30 @@ class MainActivity : AppCompatActivity() {
             builtInZoomControls = true
             displayZoomControls = false
         }
+        web.addJavascriptInterface(Puente(), "AppInventario")
         web.webViewClient = object : WebViewClient() {
             override fun onPageFinished(v: WebView?, url: String?) {
                 if (url != null && url.startsWith("http")) estado.visibility = View.GONE
             }
+            override fun onPageCommitVisible(v: WebView?, url: String?) {
+                fallos = 0                    // cargó de verdad
+            }
             override fun onReceivedError(v: WebView?, req: WebResourceRequest?,
                                          err: WebResourceError?) {
-                if (req?.isForMainFrame == true) noConecta()
+                if (req?.isForMainFrame != true) return
+                // Un corte suelto (el WiFi cambia de antena, Android cambia de
+                // red) no es «no hay servidor»: se reintenta un par de veces
+                // antes de ponerse a buscarlo por toda la red.
+                fallos++
+                if (fallos <= 2) {
+                    ui.postDelayed({ web.loadUrl(destino) }, 2000L * fallos)
+                } else {
+                    fallos = 0
+                    noConecta()
+                }
             }
         }
-        findViewById<Button>(R.id.btnConfig).setOnClickListener { dialogoConfig() }
+        estado.setOnClickListener { dialogoConfig() }
 
         if (direccion.isBlank() && afuera.isBlank()) buscarServidor() else abrir()
     }
@@ -301,6 +318,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .show()
+    }
+
+    /** El ⚙ de la pantalla del inventario (junto a la 🌙) llama aquí: la
+     *  página lo muestra solo si existe «AppInventario», o sea, dentro de la app. */
+    inner class Puente {
+        @android.webkit.JavascriptInterface
+        fun ajustes() {
+            runOnUiThread { dialogoConfig() }
+        }
     }
 
     override fun onResume() {

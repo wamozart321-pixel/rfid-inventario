@@ -128,6 +128,7 @@ class MainActivity : Activity(), RFIDCallback {
             builtInZoomControls = true
             displayZoomControls = false
         }
+        w.addJavascriptInterface(Puente(), "AppInventario")
         w.webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageFinished(v: android.webkit.WebView?, url: String?) {
                 est.visibility = android.view.View.GONE
@@ -892,6 +893,15 @@ class MainActivity : Activity(), RFIDCallback {
     private fun dialogoAviso(t: String, m: String) =
         AlertDialog.Builder(this).setTitle(t).setMessage(m).setPositiveButton("OK", null).show()
     private fun toast(m: String) = Toast.makeText(this, m, Toast.LENGTH_SHORT).show()
+
+    /** El ⚙ de la pantalla del inventario (junto a la 🌙) llama aquí: la
+     *  página lo muestra solo si existe «AppInventario», o sea, dentro de la app. */
+    inner class Puente {
+        @android.webkit.JavascriptInterface
+        fun ajustes() {
+            runOnUiThread { dialogoConfig() }
+        }
+    }
 
     override fun onResume() {
         super.onResume()

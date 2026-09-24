@@ -47,6 +47,11 @@ html[data-tema="oscuro"] img{filter:brightness(.94)}
 /* el papel de la etiqueta SIEMPRE es blanco: es lo que se va a imprimir */
 html[data-tema="oscuro"] #dis-etq,
 html[data-tema="oscuro"] #dis-etq *{filter:none}
+/* ⚙ de la app (pistolas y celular): solo existe dentro de ellas, ver ajustesApp() */
+#btn-app{display:none;align-items:center;padding:0 12px;cursor:pointer;font-size:16px;
+         border-left:1px solid var(--borde);user-select:none}
+#btn-app.visible{display:flex}
+#btn-app:hover{background:var(--caja)}
 #btn-tema,#btn-salir{display:flex;align-items:center;padding:0 12px;cursor:pointer;font-size:15px;
           border-left:1px solid var(--borde);user-select:none}
 #btn-tema:hover,#btn-salir:hover{background:var(--caja)}
@@ -240,7 +245,7 @@ label.chk input,.m-cuerpo label.radio input{width:auto!important}
        flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #marca{padding:0 12px;font-size:0}
   #marca::before{content:'☰';font-size:17px}
-  #btn-escala,#btn-tema,#btn-salir{flex:none}
+  #btn-escala,#btn-app,#btn-tema,#btn-salir{flex:none}
   .bg{min-width:46px;max-width:62px;font-size:10px;gap:2px}
   .bg .ic{font-size:17px}
   #buscar{width:100%;margin:4px 0}
@@ -316,6 +321,7 @@ if(window.matchMedia){
   {% if modo != 'vendedor' %}<div class="tab" data-tab="inventario">Inventario</div>{% endif %}
   <div id="tira-info">{% if modo == 'vendedor' %}👁 SOLO CONSULTA (VENDEDORES) &nbsp;·&nbsp; {% elif modo == 'principal' %}🖥 PC PRINCIPAL &nbsp;·&nbsp; {% endif %}REPUESTOSVOLKSWAGENCOM SAS</div>
   <div id="btn-escala" onclick="ajustarEscala()" title="Tamaño de la pantalla">Aa</div>
+  <div id="btn-app" onclick="ajustesApp()" title="Ajustes de esta app">⚙</div>
   <div id="btn-tema" onclick="cambiarTema()" title="Cambiar entre claro y oscuro">🌙</div>
   {% if afuera %}<div id="btn-salir" onclick="salirAfuera()" title="Cerrar la sesión en este equipo">🚪</div>{% endif %}
 </div>
@@ -4173,6 +4179,14 @@ function cambiarTema(){
   bmsg(nuevo === 'oscuro' ? 'Modo oscuro' : 'Modo claro');
 }
 pintarBotonTema();
+
+/* Dentro de las apps de Android (pistolas y celular) la app pone
+   «window.AppInventario»: entonces aparece el ⚙ y abre SUS ajustes (servidor,
+   modo, actualizaciones). En el PC no existe y el botón no sale. */
+function ajustesApp(){
+  try{ window.AppInventario.ajustes(); }catch(e){ toast('✖ Estos ajustes solo existen en la app'); }
+}
+if(window.AppInventario) document.getElementById('btn-app').classList.add('visible');
 
 /* En el celular los filtros van plegados: solo se ve «🔎 Filtros ▾» y la
    cuenta. Al tocar se despliegan. En el PC esto no cambia nada. */

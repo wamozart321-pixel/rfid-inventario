@@ -52,6 +52,18 @@ assert "quienEs(base(direccion))" in abrir and "usandoAfuera = !enBodega" in abr
 assert "CookieManager.getInstance().flush()" in fuente, "la sesión de afuera debe guardarse"
 ok("la del celular prueba primero la bodega y, si no contesta, entra por internet")
 
+# --- el ⚙ de los ajustes de la app va en la pantalla, junto a la 🌙 ---
+for carpeta, paq in (("android-c72", "rfid"), ("android-alien", "alien"), ("android-movil", "movil")):
+    kt = open(os.path.join(RAIZ, carpeta, "app", "src", "main", "java", "com", "inventario", paq,
+                           "MainActivity.kt"), encoding="utf-8").read()
+    assert 'addJavascriptInterface(Puente(), "AppInventario")' in kt, carpeta
+    puente = kt.split("inner class Puente")[1][:300]
+    assert "@android.webkit.JavascriptInterface" in puente and "dialogoConfig()" in puente, carpeta
+lay = open(os.path.join(RAIZ, "android-movil", "app", "src", "main", "res", "layout",
+                        "activity_main.xml"), encoding="utf-8").read()
+assert "btnConfig" not in lay, "la app del celular ya no lleva la barra con el ⚙ arriba"
+ok("las tres apps abren sus ajustes desde el ⚙ de la pantalla; el celular sin barra arriba")
+
 # --- pesa bastante menos que las de pistola ---
 gs = {n: os.path.getsize(os.path.join(RAIZ, n)) for n in
       ("InventarioRFID-C72.apk", "InventarioRFID-Movil.apk")}

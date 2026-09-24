@@ -191,6 +191,31 @@ with sync_playwright() as pw:
     ok("en un celular estrecho (360 px) cabe al 100 % y al 150 %")
     cel360.close()
 
+    # --- dentro de las apps (pistolas y celular) sale además el ⚙ de la app,
+    # junto a la 🌙: la tira tiene que seguir cabiendo con él ---
+    app = nav.new_context(viewport={"width": 360, "height": 780}, device_scale_factor=3,
+                          is_mobile=True, has_touch=True)
+    app.add_init_script("window.AppInventario = {ajustes(){ window.__ajustes = (window.__ajustes||0) + 1; }};")
+    pa = app.new_page()
+    for esc in (None, "1.5"):
+        pa.goto(URL)
+        pa.evaluate("e => { if(e) localStorage.setItem('escala', e); "
+                    "else localStorage.removeItem('escala'); }", esc)
+        pa.goto(URL)
+        pa.wait_for_selector("#t-productos tbody tr:not(.esp)", timeout=15000)
+        pa.wait_for_timeout(300)
+        ma = pa.evaluate(MEDIR)
+        assert ma["sobra"] <= 1, "con el ⚙ de la app la tira se sale: " + str(ma)
+        b1 = pa.evaluate("[...document.querySelectorAll('#tira > *')].map(e => [e.id, "
+                         "Math.round(e.getBoundingClientRect().right)])")
+        assert all(r <= ma["ancho"] + 1 for _, r in b1), b1
+    orden = [i for i, _ in b1 if i in ("btn-escala", "btn-app", "btn-tema")]
+    assert orden == ["btn-escala", "btn-app", "btn-tema"], orden
+    pa.click("#btn-app")
+    assert pa.evaluate("window.__ajustes") == 1, "el ⚙ no llamó a los ajustes de la app"
+    ok("en la app sale el ⚙ a la izquierda de la 🌙, abre SUS ajustes y cabe hasta al 150 %")
+    app.close()
+
     # --- el tamaño se recuerda al volver a abrir ---
     pag.goto(URL)
     pag.wait_for_timeout(300)
@@ -224,6 +249,7 @@ with sync_playwright() as pw:
     pp.wait_for_timeout(300)
     m = pp.evaluate(MEDIR)
     assert m["boton"] == "none", "en el PC el botón no debería verse"
+    assert pp.evaluate("getComputedStyle(document.getElementById('btn-app')).display") == "none",         "en el PC (sin app) el ⚙ de la app no debe salir"
     assert m["ancho"] >= 1260, "en el PC el ajuste no debería cambiar nada: " + str(m)
     assert m["col4"] != "none"
     ok("en el PC el botón no aparece y el ajuste no cambia nada")
